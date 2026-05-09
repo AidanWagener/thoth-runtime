@@ -1,0 +1,234 @@
+---
+title: Quickstart
+description: From git clone to a Slack bot replying — in under ten minutes.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+This is the fastest path from zero to a working Thoth bridge. If you
+hit any friction, the Discord (`#help` channel) is the quickest
+fix — the founder lurks there during launch month.
+
+## Prerequisites
+
+You need three things on your machine before starting:
+
+<Steps>
+
+1. **Node.js 20 or newer.** Verify with `node --version`. Install
+   from [nodejs.org](https://nodejs.org/) if missing.
+
+2. **pnpm 9 or newer.** Verify with `pnpm --version`. Install with
+   `npm install -g pnpm` if missing.
+
+3. **Claude CLI logged in to your Max subscription.** Run
+   `claude /status` — it should report your Max plan. If it shows
+   API or Bedrock auth, run `claude /logout` then `claude /login`
+   and pick the subscription option.
+
+</Steps>
+
+<Aside type="caution" title="Hard requirement">
+The runtime **refuses to start** if any of `ANTHROPIC_API_KEY`,
+`ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_USE_BEDROCK`,
+`CLAUDE_CODE_USE_VERTEX`, or `CLAUDE_CODE_USE_FOUNDRY` are set in
+your shell. These would silently bill against the API instead of
+your Max subscription. Run `env | grep -E 'ANTHROPIC|CLAUDE_CODE_USE'`
+to confirm none are set.
+</Aside>
+
+You also need a Slack workspace where you can install a custom app.
+Personal/free Slack workspaces are fine.
+
+## Step 1 — Scaffold a project
+
+```bash
+npx @thoth-runtime/cli init my-thoth
+cd my-thoth
+pnpm install
+```
+
+The init wizard asks which template to use. For your first run, pick
+`minimal`. (You can also pick `operator-agent` — the full operator-grade
+example — but it has more configuration to fill out.)
+
+## Step 2 — Create your Slack app
+
+You need three credentials from Slack: a **bot token**, an **app
+token**, and your **member ID**. The setup takes ~5 minutes.
+
+<Steps>
+
+1. Visit [api.slack.com/apps](https://api.slack.com/apps) and click
+   **Create New App** → **From a manifest**.
+
+2. Pick your workspace, then paste the contents of
+   `examples/minimal/manifest.yaml` (or `examples/operator-agent/manifest.yaml`
+   if you used that template).
+
+3. After the app is created:
+   - **OAuth & Permissions** → **Install to Workspace** → accept the
+     scopes. Copy the **Bot User OAuth Token** (starts with `xoxb-`).
+   - **Basic Information** → scroll to **App-Level Tokens** →
+     **Generate Token and Scopes**. Name it `socket`, add the
+     `connections:write` scope, click **Generate**. Copy the token
+     (starts with `xapp-`).
+
+4. Find your member ID:
+   In Slack, click your avatar → **Profile** → **⋯** menu →
+   **Copy member ID**. It looks like `U01ABC123XYZ`.
+
+5. Invite the bot into the channels you want it to listen in
+   (`/invite @claude` or whatever you named the bot). DMs work
+   without an invite.
+
+</Steps>
+
+## Step 3 — Configure `.env`
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` in your editor and fill in:
+
+```bash
+SLACK_BOT_TOKEN=xoxb-your-bot-token-here
+SLACK_APP_TOKEN=xapp-your-app-token-here
+ALLOWED_USERS=U01ABC123XYZ   # your member ID, comma-separate for multiple
+```
+
+That's the minimum. The other variables in `.env.example` have
+sensible defaults; tune them later.
+
+## Step 4 — Start the bridge
+
+```bash
+pnpm dev
+```
+
+You should see a banner like this:
+
+```
+████████╗██╗  ██╗ ██████╗ ████████╗██╗  ██╗
+╚══██╔══╝██║  ██║██╔═══██╗╚══██╔══╝██║  ██║
+   ██║   ███████║██║   ██║   ██║   ███████║
+   ██║   ██╔══██║██║   ██║   ██║   ██╔══██║
+   ██║   ██║  ██║╚██████╔╝   ██║   ██║  ██║
+   ╚═╝   ╚═╝  ╚═╝ ╚═════╝    ╚═╝   ╚═╝  ╚═╝
+   the lifelong-learning agent runtime · v0.5.0
+
+INFO: auth probe passed: no API-routing env vars set
+INFO: persona stack loaded (totalChars=…, loadedFiles=…)
+INFO: session store ready (dbPath=./bridge.db)
+INFO: thoth online (Socket Mode)
+
+  ▸ dashboard:  http://localhost:8787
+```
+
+The dashboard auto-opens in your default browser.
+
+## Step 5 — DM the bot
+
+Go to your Slack workspace, find the bot in your sidebar, and DM it:
+
+> Hello — first message
+
+You'll see the message stream into the bot's reply within a few
+seconds. The first turn loads your persona stack into Claude's
+context (you'll notice the dashboard logs an "Thoth" entity becoming
+active). Replies in the same thread continue the same Claude
+session via `claude --resume`.
+
+## Step 6 — Try a reaction
+
+Add a `✅` reaction to the bot's reply. The dashboard logs the
+reaction event. Behind the scenes, this marks the turn as
+`verified=success` — feeding into reflection at session-end.
+
+The five reactions are:
+
+| Emoji | Effect |
+|---|---|
+| ✅ | Mark turn `verified=success` (boosts skill-compile signal) |
+| ❌ | Mark turn `verified=failure` (next reflection writes a stronger note) |
+| 🧠 | Save the turn verbatim into MEMORY.md (with secret redaction) |
+| 🗑️ | Mark this episode outdated (excluded from future recall) |
+| 👤 | Record as user-feedback observation in Honcho |
+
+## Step 7 — End the session, see reflection fire
+
+Type `/done` in the thread (or wait 30 minutes for idle-fire). The
+bridge runs a Reflexion subprocess over the transcript and emits
+structured JSON. If the reflection proposes a new skill or memory
+note, you'll see a Slack DM with an approval card.
+
+That's the full loop.
+
+## What's next
+
+- **Read [The 5-layer memory architecture](/concepts/memory/)** — the
+  cornerstone post explaining what makes Thoth different
+- **Customize your persona** — replace the stubs in `persona/` with
+  your own SOUL.md, RULES.md, etc. See
+  [The persona stack](/concepts/persona-stack/)
+- **Connect Honcho** for theory-of-mind on each peer (optional but
+  recommended). Set `HONCHO_API_KEY` in `.env`. Free tier at
+  [app.honcho.dev](https://app.honcho.dev/)
+- **Explore the dashboard** at `http://localhost:8787` — Tree of
+  Life, Akashic Records, Council, Cosmos
+
+## Troubleshooting
+
+### "refusing to start: env vars present that would override Max subscription billing"
+
+You have `ANTHROPIC_API_KEY` (or another routing variable) set in
+your shell. Unset it:
+
+```bash
+# bash/zsh
+unset ANTHROPIC_API_KEY
+
+# PowerShell
+Remove-Item Env:ANTHROPIC_API_KEY
+```
+
+Then `pnpm dev` again.
+
+### "config error" at startup
+
+Your `.env` is missing required keys. The error output lists which
+keys are missing.
+
+### "claude exited code N"
+
+Most common: `claude` not on PATH, or not logged in. Verify with
+`claude /status` in a fresh terminal. If it works there but not in
+the bridge, set `CLAUDE_BIN` in `.env` to the absolute path:
+
+```bash
+# Windows
+CLAUDE_BIN=C:/Users/<you>/AppData/Roaming/npm/claude.cmd
+
+# macOS / Linux
+CLAUDE_BIN=/usr/local/bin/claude
+```
+
+### "Bot connects but doesn't respond"
+
+Check three things:
+
+1. Is your member ID in `ALLOWED_USERS`?
+2. Did you DM the bot directly (not @-mention in a channel)?
+3. If channel mention: is the bot invited to that channel?
+
+### "No assistant output"
+
+Likely the `claude` binary version emits stream-json events in a
+shape the parser doesn't recognize. Run with `LOG_LEVEL=debug` to
+see raw events, then file an issue at
+[github.com/thoth-runtime/thoth/issues](https://github.com/thoth-runtime/thoth/issues).
+
+### Anything else
+
+[Discord `#help`](https://discord.gg/thoth-runtime). Founder lurks.

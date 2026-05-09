@@ -1,0 +1,19 @@
+{
+  "name": "@thoth-runtime/example-minimal",
+  "version": "0.5.0",
+  "private": true,
+  "description": "Smallest runnable Thoth config. ~20 lines to a working bot.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "start": "thoth start",
+    "dev": "thoth dev",
+    "doctor": "thoth doctor",
+    "smoke": "thoth smoke"
+  },
+  "dependencies": {
+    "@thoth-runtime/cli": "workspace:*",
+    "@thoth-runtime/core": "workspace:*",
+    "@thoth-runtime/transport-slack": "workspace:*"
+  }
+}

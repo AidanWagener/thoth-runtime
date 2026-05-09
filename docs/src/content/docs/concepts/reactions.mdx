@@ -1,0 +1,202 @@
+---
+title: Reactions as training signals
+description: How ✅❌🧠🗑️👤 on the bot's replies become learning signals — without a separate labelling tool.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Most agent products treat the chat surface as input and the model as
+black-box. To "improve" the agent, you go somewhere else (a labelling
+tool, a feedback form, a model retraining pipeline) and feed signals
+in.
+
+Thoth's bet: **the chat surface IS the labelling surface**.
+
+Five emoji reactions on the bot's replies feed five distinct signals
+into Thoth's memory + skill system. No separate tool. The training
+loop happens in the place you're already paying attention.
+
+## The five reactions
+
+| Emoji | Signal | What it does |
+|---|---|---|
+| ✅ | "this was right" | Mark turn `verified=success`. Boosts skill-compile signal in next reflection. |
+| ❌ | "this was wrong" | Mark turn `verified=failure`. Next reflection writes a stronger `what_didnt` note. |
+| 🧠 | "remember this" | Save the turn verbatim into MEMORY.md (with secret redaction). |
+| 🗑️ | "outdated" | Mark this episode outdated. Excluded from future recall. |
+| 👤 | "feedback about me" | Record as a user-feedback observation in Honcho. |
+
+Each one writes to a different layer of Thoth's [5-layer memory
+architecture](/concepts/memory/). They are NOT redundant.
+
+## ✅ — Verified success
+
+When you react with ✅:
+
+1. The episode in `bridge.db` gets `verified_status = 'success'`,
+   `verified_by = <your-user-id>`, `verified_at = <now>`.
+2. At session-end reflection, Thoth's `claude -p` reflection
+   subprocess sees this episode tagged success.
+3. If the same pattern appears across multiple ✅-tagged episodes,
+   reflection proposes a skill (`should_skill: true` in the
+   structured JSON).
+4. The skill draft writer creates `.claude/skills/<slug>/SKILL.md`
+   and DMs you an approval card.
+
+You're effectively saying: *"This is the kind of thing I want
+crystallized into a reusable skill."*
+
+## ❌ — Verified failure
+
+When you react with ❌:
+
+1. The episode gets `verified_status = 'failure'`.
+2. At reflection, the `what_didnt` field gets a stronger weighting.
+3. The next time a similar query appears, episodic recall surfaces
+   this failed example to the agent's context, with the failure
+   tag visible.
+4. The agent learns *not to do this again* by example, not by
+   instruction.
+
+This is the **negative training signal**. Use it when the bot's
+reply was actively wrong — not just suboptimal.
+
+<Aside type="tip" title="Don't ❌ casual mistakes">
+For minor bugs ("typo in summary", "missed one Sentry issue"),
+correct the bot inline rather than ❌. Save ❌ for genuinely wrong
+replies — confusing logic, hallucinated facts, contraindicated
+advice. ❌ is durable; corrections are ephemeral.
+</Aside>
+
+## 🧠 — Save to memory verbatim
+
+When you react with 🧠:
+
+1. The bot's reply text is appended to your `MEMORY.md` file
+   verbatim.
+2. Before writing, the redaction pass scans for secrets (Slack
+   tokens, GitHub PATs, API keys, env-style `*_SECRET` patterns).
+   Matches are replaced with `[REDACTED:<kind>]`.
+3. The next time MEMORY.md loads (next session boot, or after
+   persona-drift detection), this content is in context.
+
+Use 🧠 when the bot has surfaced a *durable insight* — a fact, a
+process, a decision — that you want it to remember next time.
+
+Examples of good 🧠 candidates:
+
+- "The production orchestrator is `service-orchestrator-v2`, not v1"
+- "Cherry-picks from staging to main; never `git merge`"
+- "EU AI Act classifies our use case as high-risk Annex III Cat 3a"
+
+Example of a bad 🧠 candidate:
+
+- "The Sentry dashboard is at `sentry.io/orgs/{your-org}`" — that's
+  in TOOLS.md already
+
+## 🗑️ — Outdated
+
+When you react with 🗑️:
+
+1. The episode gets `outdated = 1` in the SQLite store.
+2. Episodic recall queries filter on `outdated = 0`. The episode
+   is now invisible to future recall.
+3. The episode still exists in storage (you can `/recall` it
+   explicitly via slug if you remember it). But it doesn't
+   surface in routine recalls.
+
+Use 🗑️ when an episode contains *information that became wrong over
+time* — not because the bot was wrong then, but because reality
+moved.
+
+Examples:
+
+- A reply about an API endpoint that's since been deprecated
+- A reply about a process that's been replaced with a new one
+- A reply about a person who's no longer in the role
+
+## 👤 — User feedback observation
+
+When you react with 👤:
+
+1. The reaction context (the bot's reply + your reaction) is
+   forwarded to Honcho's identity layer as an Thoth-authored
+   observation about *you* (the reactor).
+2. Honcho integrates this into your peer model.
+3. Future Dialectic queries about you may surface this observation
+   when relevant.
+
+Use 👤 when the *bot's reply revealed something about you as a user*
+that should inform future interactions.
+
+Examples:
+
+- A reply asks "do you want me to summarize?" and you 👤 to signal
+  "yes, this is the kind of question worth checking in on"
+- A reply uses German in a context where you'd prefer English; you
+  👤 to encode the preference
+
+## Why reactions, not a labelling UI?
+
+Reactions are:
+
+- **Always visible** — every Slack thread is a candidate
+- **Zero-friction** — one tap on mobile, one click on desktop
+- **Already familiar** — Slack users react constantly anyway
+- **Multi-user** — different people in a thread can react with
+  different signals
+- **Idempotent** — adding then removing then re-adding produces the
+  same signal
+
+A labelling tool would be more "powerful" in features — but the
+features go unused. The friction kills the feedback loop.
+
+## How reactions interact with reflection
+
+At session-end (after `/done` or 30-min idle), the reflection
+subprocess sees the full transcript including all reactions.
+
+The reflection prompt includes:
+
+```
+Of the [N] turns in this session:
+- [k1] were marked ✅ verified=success
+- [k2] were marked ❌ verified=failure
+- [k3] were marked 🧠 saved to memory
+- [k4] were marked 🗑️ outdated
+
+Pay particular attention to ✅ patterns — these are signals to
+crystallize into skills.
+```
+
+The reflection's structured JSON output then gets fan-out to four
+writers (memory, skill drafts, persona observations, Honcho updates)
+per [Memory L5](/concepts/memory/#l5--reflection).
+
+Reactions are the input that drives this growth loop.
+
+## Multi-user reactions
+
+If multiple users are in a Slack thread, each reaction is attributed
+to the reactor:
+
+- ✅ from User A and ❌ from User B both register; the reflection
+  sees them as conflicting signals and weights accordingly
+- 🧠 from any user appends the reply to the *shared* MEMORY.md
+- 👤 reactions are scoped to each individual reactor's Honcho
+  peer model
+
+## What reactions DON'T do
+
+- They don't fine-tune the model. (Thoth doesn't fine-tune anything.)
+- They don't immediately change the bot's behavior. (Effect is
+  visible at next session start, after reflection has run.)
+- They don't propagate retroactively. (A 🧠 on a reply from yesterday
+  saves *that* reply to MEMORY.md, but past responses to similar
+  queries aren't rewritten.)
+
+## What's next
+
+- [Memory architecture](/concepts/memory/) — how reactions feed each layer
+- [Skills](/concepts/skills/) — how ✅ patterns become skills
+- [Persona stack](/concepts/persona-stack/) — what MEMORY.md looks like

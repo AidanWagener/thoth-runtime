@@ -1,0 +1,236 @@
+---
+title: Ambient agents
+description: How Thoth thinks while you sleep — daily budget envelope, scheduled triggers, autonomous follow-ups.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Most agents are **reactive**: you ask, they answer. Thoth has a
+parallel mode — **ambient agents** — that wake on their own when
+something interesting happens.
+
+This is what makes the agent feel like it *cares* about your work,
+rather than just responds to it.
+
+## What ambient agents do
+
+A few examples of triggers that fire ambient agents in production:
+
+- **Morning digest** — at 09:00 your local time, the agent posts a
+  Slack DM summarizing what's queued, what's stale, what changed
+  overnight
+- **Stale skill nudge** — a skill draft has been pending approval for
+  >3 days, the agent gently DMs to ask if you want to ✅ or ❌
+- **Self-spawn follow-up** — reflection set a `next_check_at`
+  timestamp; the agent posts back into the original thread when the
+  time arrives
+- **Status incident announcement** — `status.claude.com` reports an
+  incident; the agent posts to a designated channel
+
+The agent isn't *always* doing this — it's bounded by a **daily
+budget envelope** (default $1/day, configurable). When the budget
+exhausts, ambient activity pauses until the next UTC day.
+
+## The budget envelope
+
+The fundamental constraint is `AMBIENT_DAILY_CAP_USD` (default
+`1.0`). Every ambient action — every LLM call made by a trigger —
+debits from a per-day pool.
+
+```
+Day starts (00:00 UTC):
+  budget remaining: $1.00
+
+Trigger A fires (morning digest, $0.07 LLM call):
+  budget remaining: $0.93
+
+Trigger B fires (skill-draft nudge, $0.01 LLM call):
+  budget remaining: $0.92
+
+Trigger C fires (self-spawn follow-up, $0.15 LLM call):
+  budget remaining: $0.77
+
+[5 more triggers throughout day]
+
+Trigger Z fires ($0.20 LLM call):
+  insufficient budget → trigger DEFERRED to next day
+```
+
+This is **visible autonomy**: the dashboard's "ambient" tile shows
+real-time burndown. Trust earned by being legible, not by being
+cautious.
+
+## Trigger types
+
+Out of the box, Thoth ships with these trigger types:
+
+### 1. Cron triggers (scheduled)
+
+Fire on a cron schedule. Used for morning digest, weekly summaries,
+nightly housekeeping.
+
+```yaml
+- name: morning_digest
+  type: cron
+  schedule: '0 9 * * *'        # 09:00 daily
+  budgetUsd: 0.50
+  prompt: |
+    Generate a morning digest for {founder}.
+    Include: pending skill drafts, recent Sentry issues,
+    threads idle >12h, party results since last digest.
+```
+
+### 2. Threshold triggers (debounce)
+
+Fire when a counter crosses a threshold. Used for "skill draft has
+been pending >3 days."
+
+```yaml
+- name: stale_skill_nudge
+  type: threshold
+  watch: skill_drafts.pending_days >= 3
+  cooldownHours: 168  # don't re-nudge same skill within a week
+  budgetUsd: 0.05
+```
+
+### 3. Schedule-from-reflection (self-spawn)
+
+Set during session-end reflection. The reflection writer can emit a
+`next_check_at` ISO timestamp; the scheduling poller fires at that
+time.
+
+```json
+{
+  "outcome": "partial",
+  "next_check_at": "2026-05-12T10:00:00Z",
+  "user_model_updates": {
+    "U_EXAMPLE_USER": ["wants to revisit the Sentry refactor next Monday"]
+  }
+}
+```
+
+The poller fires at the timestamp by **synthesizing a Slack message**
+into the original thread:
+
+> 🤖 self-spawn follow-up — reflection scheduled this check
+>
+> Following up on Sentry refactor — any progress, or want me to draft
+> the spec?
+
+Caps:
+- 5 self-spawns per thread (prevents loops)
+- 60-second cooldown between fires
+- `/loop-stop` cancels all pending
+
+### 4. Status-change triggers
+
+Fire on a state transition you watch. Built-in example:
+`anthropic-status-monitor` polls `status.claude.com` every 60s and
+fires when an incident transitions (new / updated / resolved).
+
+```yaml
+- name: anthropic_status_announce
+  type: status_change
+  source: anthropic-status
+  channel: '#ops-claude-status'
+  budgetUsd: 0  # no LLM call needed; pure forwarding
+```
+
+## Cost economics
+
+A typical Pro-tier user with all default ambient triggers enabled
+spends about $0.30–$0.50/day on ambient activity:
+
+| Trigger | Frequency | Cost |
+|---|---|---|
+| Morning digest | 1×/day | ~$0.10 |
+| Stale skill nudge | 1–2×/week | ~$0.01 |
+| Self-spawn follow-ups | 0–3×/day | ~$0.10–$0.30 |
+| Status announce | 0–1×/day | ~$0 (no LLM) |
+
+The default $1/day cap is generous. Tune down via
+`AMBIENT_DAILY_CAP_USD=0.50` if you want.
+
+## Disabling
+
+Three levels of disable:
+
+```bash
+# Disable all ambient agents
+AMBIENT_DISABLED=true
+
+# Disable specific trigger types
+AUTO_HARVEST_DISABLED=true              # stops the auto-skill harvester
+ANTHROPIC_STATUS_DISABLED=true          # stops the status monitor
+
+# Disable just the announcement (keep monitoring)
+ANTHROPIC_STATUS_ANNOUNCE_CHANNEL=     # unset → no Slack posts
+```
+
+## Anti-pattern: ambient as autonomous-action
+
+Ambient triggers are designed for **proactive surfacing**, not
+**autonomous action**. Don't write triggers that:
+
+- Auto-merge code
+- Auto-deploy to production
+- Auto-respond to customer inquiries
+- Auto-spend on external services
+
+The mental model: **ambient agents bring things to your attention,
+they don't act on your behalf.** Action requires explicit founder
+approval (✅ on a Slack card) per Thoth's hard rules.
+
+If you find yourself writing a trigger that sounds like
+"automatically X without asking," you're misusing ambient. Either:
+
+1. Restructure as "DM the founder asking for ✅" before X happens
+2. Move the logic into a skill that the founder explicitly invokes
+
+This isn't capability-gating — it's a deliberate design choice. The
+agent that surprises you with autonomous actions earns less trust
+over time than the agent that surfaces options for you to choose.
+
+## Self-spawn pattern in depth
+
+The most powerful ambient pattern is **self-spawn from reflection**.
+
+Sequence:
+
+1. You ask Thoth something complex: "How should I think about the
+   Sentry refactor?"
+2. Thoth replies thoughtfully but acknowledges uncertainty
+3. Session ends; reflection runs over the transcript
+4. Reflection notes: "outcome: partial; user wanted concrete answer
+   but I gave conditional one"
+5. Reflection emits: `next_check_at: <next Monday 10:00 user TZ>`
+6. Scheduling poller stores the entry
+7. Monday 10:00 comes. The poller dispatches a synthetic message
+   into the original thread.
+8. Thoth (now resumed via `claude --resume <session>`) sees the
+   self-spawn prompt in the same context, with all the prior
+   conversation, and posts a follow-up:
+
+> Following up on the Sentry refactor — I've been thinking. Want
+> me to draft a spec or do you want to sketch the migration plan
+> first?
+
+This creates the impression of an agent that *carries unfinished
+business across days*. Which it does.
+
+## Caps + safety
+
+- Max 5 self-spawn fires per thread
+- 60-second cooldown between fires within a thread
+- `/loop-stop` cancels all pending self-spawns
+- Daily budget envelope caps total ambient spend
+- All ambient actions logged to dashboard (transparent)
+
+## What's next
+
+- [SPEC-decision-records](/specs/) — the v0.6 spec for full ambient-
+  trigger audit trails
+- [Reflection at session-end](/concepts/reflection/) — what feeds
+  `next_check_at`
+- [Reactions](/concepts/reactions/) — `/loop-stop` and reaction
+  controls

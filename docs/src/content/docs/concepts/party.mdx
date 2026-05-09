@@ -1,0 +1,166 @@
+---
+title: Multi-agent council (party)
+description: Convene a debate of personas to wrestle with hard questions. Mary on GPT-5, John on Claude, Winston on Gemini — synthesis still yours.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+When a single agent's perspective isn't enough, Thoth lets you **convene
+a council** — a structured debate of personas, each with their own
+mission and voice. The pattern is borrowed from the BMAD agent framework
+and from real human strategy councils.
+
+It's also the most photogenic feature Thoth ships.
+
+## What is a party
+
+A party is a multi-agent deliberation where:
+
+1. **N personas** (typically 3–5) are spawned in parallel against the same prompt
+2. Each emits an opinion grounded in their role + voice
+3. A **judge persona** synthesizes the perspectives into a final response
+4. The full transcript is preserved as a Slack canvas (or thread) for review
+
+Each persona is a separate `claude -p` subprocess with its own persona
+file. They don't share context; they only see the original prompt and
+each other's published opinions.
+
+## When to use it
+
+- **High-stakes decisions** where you want multiple frames before committing
+- **Architectural choices** where you want the conservative AND the
+  bold AND the simplicity-loving voice
+- **Pre-mortems** where you specifically want a skeptic to find what
+  could go wrong
+- **Strategy questions** where the answer needs synthesis, not retrieval
+
+## When NOT to use it
+
+- **Routine questions** — costs ~$0.50–$2 per party; not worth it for
+  things a single Apex turn handles
+- **Time-sensitive responses** — parties take 30–90s due to parallel
+  spawn + synthesis
+- **Questions with a single right answer** — debate is theatre when
+  facts are clear; just ask
+
+## Default personas (BMAD-derived)
+
+The shipped operator-agent example includes these party personas:
+
+| Persona | Role | Voice |
+|---|---|---|
+| **Mary** | Product strategist | Big-picture, market-aware, optimistic but not naive |
+| **John** | Pragmatic engineer | Constraint-aware, rolls eyes at hype, cares about ops |
+| **Winston** | Security skeptic | Adversarial, finds attack surfaces, slows you down (in a good way) |
+| **James** | Creative explorer | Generates options, plays with constraints, not afraid of weird ideas |
+| **Maat** *(judge)* | Synthesizer | Weighs all perspectives against context, emits decision |
+
+Each persona file lives in `persona/apex/party/` with the same shape as
+the main persona stack (SOUL, RULES, voice rules) but specialized to the
+role.
+
+## Invoking a party
+
+In Slack:
+
+```
+/party Should we adopt agentskills.io as our skill format spec?
+```
+
+The bot acknowledges the party convening, then over the next ~60s:
+
+1. Posts each persona's opinion as a separate Slack Block Kit Card
+2. Posts the judge's synthesis as a final Card
+3. Optionally exports the full transcript as a Slack canvas
+
+You can pass options:
+
+```
+/party Should we adopt agentskills.io as our skill format spec?
+  --personas mary,john,winston      # restrict roster
+  --rounds 2                        # run 2 deliberation rounds (default 1)
+  --budget 2.50                     # $/cap for this party
+  --canvas                          # auto-publish as Slack canvas
+```
+
+## Cost economics
+
+| Configuration | Approx cost | Approx duration |
+|---|---|---|
+| 3 personas, 1 round | $0.50–$0.80 | 30–45s |
+| 4 personas, 1 round | $0.70–$1.20 | 40–60s |
+| 4 personas, 2 rounds | $1.50–$2.50 | 90–120s |
+| 5 personas + judge, 2 rounds, canvas export | $2.00–$3.50 | 2–3 min |
+
+Per-party budget cap defaults to `$1.50` (`PARTY_DEFAULT_BUDGET_USD`).
+Daily total cap defaults to `$10` (`PARTY_DAILY_CAP_USD`). Beyond cap,
+parties are refused with a clear message.
+
+## Multi-LLM (v0.6+)
+
+In v0.5, all personas run on Claude (homogeneous). The most-anticipated
+v0.6 feature is **heterogeneous models per persona**:
+
+- Mary on GPT-5
+- John on Claude Opus
+- Winston on Gemini Pro
+- James on Claude Haiku (cheap, creative)
+- Judge always on the founder's chosen model
+
+Research shows multi-model debates produce **substantially different
+outcomes** than single-model debates — different training data surfaces
+different perspectives. Plus the screenshot of three named LLMs
+debating in a Slack thread is unforgettable marketing.
+
+Tracked in [SPEC-multi-llm-party](/specs/). Target: Q1 2027.
+
+## Recursive parties (advanced)
+
+A persona within a party can convene a **sub-party** for a question
+that requires another deliberation. Example:
+
+```
+You: /party Should we ship feature X?
+
+Mary (strategist): "Ship it. The market's moving."
+John (engineer):    "Block. Our test coverage is at 40%. /party How long
+                     would proper testing take?"
+   └─ sub-party fires
+   └─ Mary (sub): "2 weeks."
+   └─ Winston (sub): "3 weeks if you want SOC2 carryover."
+   └─ Maat (sub-judge): "Rule of thumb: 2.5 weeks."
+John: "OK if we delay 2.5 weeks for proper coverage, ship. Otherwise no."
+Winston: "Plus a security review pass."
+Maat (top-judge): "Ship in 3 weeks with covered tests + security pass."
+```
+
+Recursive parties are bounded by depth (default max 2 levels) and
+budget (sub-parties debit from the same envelope).
+
+## How parties influence the rest of Thoth
+
+A party transcript is **first-class data**:
+
+1. The full debate is stored in `bridge.db` `parties` + `party_messages`
+   tables
+2. Reactions on individual persona Cards influence reflection signal
+   (e.g., ✅ on Mary's opinion → Mary's reasoning gets weighted higher
+   in skill compilation)
+3. Synthesized decisions written to MEMORY.md become durable references
+4. The dashboard's **Council tab** visualizes party transcripts in a
+   ritual-scroll format
+
+## Disabling
+
+```bash
+PARTY_DISABLED=true     # disables /party command entirely
+```
+
+You can also disable just specific personas by removing their files
+from `persona/apex/party/`.
+
+## What's next
+
+- [Reflection at session-end](/concepts/reflection/) — what happens after a party
+- [SPEC-multi-llm-party](/specs/) — the v0.6 heterogeneous-model spec
+- [Reactions](/concepts/reactions/) — how feedback flows back from party transcripts

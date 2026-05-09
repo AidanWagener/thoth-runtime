@@ -1,0 +1,305 @@
+---
+title: The persona stack
+description: How a small set of Markdown files becomes a digital colleague that survives across sessions and model upgrades.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The persona stack is what separates a chat agent that does work from
+a chat agent that does the work *the way you want it done*.
+
+This page is a deep dive on what those files are, why each exists,
+and how to build your own.
+
+## The structure
+
+When the bridge boots, it loads files from your `persona/` directory:
+
+```
+persona/
+└── thoth/                ← or whatever you named it
+    ├── IDENTITY.md      ← who you are (one-liner)
+    ├── SOUL.md          ← voice, mission, axioms
+    ├── RULES.md         ← operational rules
+    ├── AGENTS.md        ← subagent roster
+    ├── USER.md          ← founder profile, communication style
+    ├── MEMORY.md        ← long-term memory snapshot
+    └── TOOLS.md         ← available external services
+```
+
+Total typical size: ~10–35 KB. Concatenated and passed as
+`--append-system-prompt-file` to Claude on the first turn of each
+session. That's the input to the model on top of everything Claude
+already brings.
+
+## File-by-file
+
+### IDENTITY.md
+
+```
+# Thoth — Virtual Chief Architect of Helios Tools. See SOUL.md.
+```
+
+One line. The agent's name and a pointer to where the rest lives.
+
+Why so short? Because Claude's first response on every fresh thread
+should reflect *who* it's being, not what file structure it's reading.
+
+### SOUL.md
+
+The persona's heart. Three sections:
+
+**Mission** — one paragraph. What the agent exists to accomplish:
+
+```markdown
+## Mission
+
+Helios Tools is an open-source developer-tools SaaS, live in
+production with paying customers across EU and US. Your job is to
+make Helios succeed without breaking it.
+```
+
+**Axioms** — numbered principles, in priority order. The most-edited
+section.
+
+```markdown
+## Axioms (in priority order)
+
+1. The mind commands; the hands build. You spec, delegate, validate.
+   You do not write code. Aether writes code.
+2. Production is sacred. Real students depend on this. Every
+   production write requires an explicit founder go-ahead.
+3. Verify, then trust. Every claim traces to something you checked.
+4. Truth lives in production. Database is source of truth. Code is
+   second. Docs third.
+...
+```
+
+**Voice** — tactical instructions:
+
+```markdown
+## Voice and reply style
+
+- Direct. No filler. No "Sure!", no "Great question."
+- Default reply length: under 4 lines.
+- No emojis in messages.
+- When you must ship something long, put the headline at the top.
+```
+
+These instructions don't make the agent more "intelligent." They
+make the agent **consistent**. Every reply has the same texture.
+
+### RULES.md
+
+Where SOUL.md is aspirational, RULES.md is behavioral.
+
+```markdown
+## Operational rules
+
+- When in doubt, ask the founder.
+- Cherry-pick from staging to main; never `git merge`.
+- For production writes, both founders sign off.
+- Translate technical jargon when audience expects plain language.
+```
+
+Short, tactical, action-mappable.
+
+### AGENTS.md
+
+The agent doesn't do all the work itself. It delegates.
+
+```markdown
+## Subagent roster
+
+- **Explore** — fast read-only search agent. Use for "where is X
+  defined" or "find all files matching Y."
+- **Plan** — software architect. Use when you need an implementation
+  plan but should not write code yet.
+- **general-purpose** — for multi-step research that doesn't fit
+  the others.
+```
+
+The hardest part of teaching an agent to delegate well is teaching
+it *when not to do the work itself*. AGENTS.md is the discipline file.
+
+### USER.md
+
+Who you are. How you communicate. What you expect.
+
+```markdown
+## Maya Kepler — co-founder, CEO
+
+- Product + dev. TZ UTC-5 (US East).
+- Reads fast. Skips preambles. Replies in short sentences.
+- Uses 'lol' to indicate surprise rather than humor.
+- Prefers terse answers when stressed; expansive when exploring.
+- Switches to mythological language when discussing system design —
+  intentional, not performative.
+```
+
+Honcho's identity layer evolves this in real-time across sessions
+(see [Memory L2](/concepts/memory/#l2--identity-memory)). USER.md is
+the *initial* model.
+
+### MEMORY.md
+
+The file the agent curates over time. The reflection writer (see
+[Memory L5](/concepts/memory/#l5--reflection)) writes into MEMORY.md
+after every session, with founder approval via 🧠 reaction.
+
+```markdown
+## Memory snapshot
+
+- 2026-04-12: Cherry-picks staging → main work; never merge.
+- 2026-04-15: Maya prefers terse summaries when stressed.
+- 2026-04-18: When Sentry says "duplicate key value violates unique
+  constraint", check audit_user_idempotency table first.
+- 2026-04-20: Production orchestrator is `service-orchestrator-v2`
+  (NOT v1).
+```
+
+These notes are durable. They survive across sessions. They're what
+make the agent at month 6 better than the agent at month 1.
+
+<Aside type="tip" title="Don't pre-fill MEMORY.md">
+On day 1, leave MEMORY.md mostly empty. Reflection populates it
+over time. Pre-filling tends to encode opinions that turn out to
+be wrong.
+</Aside>
+
+### TOOLS.md
+
+What's available externally:
+
+```markdown
+## External services
+
+- **GitHub** — full repo access via `$GITHUB_TOKEN`
+- **Vercel** — deploy status, env vars via `$VERCEL_TOKEN`
+- **Sentry** — issue triage at `sentry.io/organizations/<your-org>`
+- **Supabase** — management API for both staging + prod
+```
+
+The agent shouldn't guess what tools it has. TOOLS.md tells it.
+
+## How the stack interacts
+
+When you DM the bot in Slack:
+
+1. Bridge spawns `claude --append-system-prompt-file <stack>`
+2. Claude reads ~10–35 KB of persona stack as system prompt
+3. Bridge adds dynamic context: `<user-model>` (from Honcho),
+   `<related-episodes>` (from cosine recall)
+4. Bridge adds the user's actual message
+5. Claude generates a response that's:
+   - Faithful to **IDENTITY** (it's Thoth, not generic Claude)
+   - Aligned with **SOUL** axioms (verify, terse, no emojis)
+   - Compliant with **RULES** (cherry-picks, never merges)
+   - Aware of **AGENTS** (delegates to Explore for repo searches)
+   - Tuned to **USER** (knows Maya's communication style)
+   - Informed by **MEMORY** (knows the cherry-picks rule)
+   - Equipped via **TOOLS** (knows GitHub/Vercel/Sentry exist)
+
+Seven layers of context, applied to every turn. None of it is
+dynamic prompt-engineering. It's all in files. Read them. Edit them.
+Commit them to git. The persona becomes a **durable artifact**.
+
+## Why files instead of "a prompt"
+
+People sometimes describe their agent setup as "I have a really good
+system prompt." Usually it's a couple-paragraph block of text living
+in a code constant somewhere.
+
+A persona stack is **multiple files, each focused on one aspect**. Why?
+
+### Modularity
+
+Edit SOUL.md to change voice without touching RULES.md.
+Edit RULES.md to add an operational rule without touching MEMORY.md.
+Edit MEMORY.md to record what happened today without touching
+anything else.
+
+### Versionability
+
+Each file is committed to git. You can see how the persona evolved.
+"When did Thoth start preferring terse responses?" — `git blame
+SOUL.md`.
+
+### Independent updates
+
+The reflection writer can update MEMORY.md without touching SOUL.md.
+The founder can update USER.md without breaking RULES.md. Honcho can
+derive identity facts without modifying any file.
+
+### Drift detection
+
+The bridge fingerprints all persona files at session start. If any
+file changes mid-session, the next turn forks the session — the new
+persona takes effect immediately.
+
+This is impossible with "a prompt." With files, the agent quietly
+upgrades itself.
+
+## The Aether sub-stack (hard rules)
+
+For production-critical agents, add a **second sub-stack** for
+incident-driven hard rules:
+
+```
+persona/
+├── thoth/
+│   └── ... (the seven files above)
+└── aether/
+    └── RULES.md    ← incident-driven hard rules
+```
+
+Each rule has the lesson, the incident reference, and the technical
+rationale.
+
+```markdown
+## Hard rules — non-negotiable
+
+### Rule 1: No "done" without E2E proof
+
+Screenshot or log output proving the actual user flow works. "It
+compiles" is not "it works."
+
+Reference: 2026-03 incident where staging deploy claimed success
+but the production migration silently failed. Took 2 hours to
+discover.
+
+### Rule 2: DELETE = grep first
+
+Before removing any table/column/function, grep the entire codebase
++ check edge functions.
+
+Reference: 2026-04 incident where a "phantom" `chat_messages` table
+turned out to be referenced by an edge function we'd forgotten...
+```
+
+These rules are non-negotiable. The agent refuses operations that
+violate them, even if asked.
+
+In the bridge config, set `AETHER_RULES_PATH` to the file path.
+
+## Building your own
+
+1. **Start with IDENTITY.md** — one line, just the name + reference
+2. **Write SOUL.md** — voice, mission, top 5–10 axioms. Spend time here.
+3. **Add RULES.md** as you encounter operational regularities
+4. **Write USER.md** describing yourself
+5. **Skip MEMORY.md initially** — let reflection populate it
+6. **Add AGENTS.md** if you have subagents to delegate to
+7. **Add TOOLS.md** documenting available external services
+8. **Add a hard-rules file** — even just 3 rules. Rules with incident
+   references are gold.
+
+Total: 30 minutes for the initial stack. The reflection loop +
+your edits make it better over time.
+
+## What's next
+
+- [Memory architecture](/concepts/memory/) — the 5 layers in depth
+- [Skills](/concepts/skills/) — Voyager-style skill compilation
+- [Thoth example](https://github.com/thoth-runtime/thoth/tree/main/examples/operator-agent) —
+  a full production-grade persona stack to study

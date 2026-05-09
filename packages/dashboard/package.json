@@ -1,0 +1,19 @@
+{
+  "name": "@thoth-runtime/dashboard",
+  "version": "0.5.0",
+  "description": "Dashboard — placeholder. v0.5 collapses dashboard into @thoth-runtime/core; v0.6 splits this out as a peer package alongside transport-discord.",
+  "license": "MIT",
+  "private": true,
+  "type": "commonjs",
+  "homepage": "https://thoth-runtime.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thoth-runtime/thoth.git",
+    "directory": "packages/dashboard"
+  },
+  "scripts": {
+    "build": "echo 'dashboard is a placeholder in v0.5 — code lives in @thoth-runtime/core. Splits in v0.6.' && exit 0",
+    "typecheck": "echo 'no sources yet' && exit 0",
+    "test": "echo 'no tests yet' && exit 0"
+  }
+}

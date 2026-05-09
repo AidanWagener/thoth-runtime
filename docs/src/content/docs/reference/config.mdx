@@ -1,0 +1,216 @@
+---
+title: Configuration reference
+description: How Thoth reads configuration in v0.5 (env vars) and what's coming in v0.6 (thoth.config.ts).
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## v0.5 — env-var configuration
+
+In v0.5, Thoth's runtime configuration lives entirely in environment
+variables, typically loaded from `.env`. See the
+[Environment variables reference](/reference/env/) for every supported
+variable.
+
+The `package.json` of your scaffolded project has scripts like:
+
+```json
+{
+  "scripts": {
+    "start": "thoth start",
+    "dev": "thoth dev"
+  }
+}
+```
+
+Both reload your `.env` on start.
+
+### Configuration precedence
+
+Variables resolve in this order (highest priority first):
+
+1. Process environment (`export FOO=bar` before running)
+2. `.env.production` (if `NODE_ENV=production`)
+3. `.env.local` (gitignored, your machine-specific overrides)
+4. `.env` (committed defaults, no secrets)
+
+### Validation
+
+The runtime validates env vars via [zod](https://zod.dev/) at boot.
+Errors look like:
+
+```
+config error — fix .env and try again:
+{
+  "ALLOWED_USERS": {
+    "_errors": ["ALLOWED_USERS must contain at least one user ID"]
+  },
+  "PERSONA_DIR": {
+    "_errors": ["String must contain at least 1 character(s)"]
+  }
+}
+```
+
+The bridge exits with code `1` on config error.
+
+### Disable patterns
+
+Most subsystems can be disabled via `<SUBSYSTEM>_DISABLED=true`:
+
+```bash
+HONCHO_DISABLED=true
+EPISODIC_DISABLED=true
+REFLECTION_DISABLED=true
+PARTY_DISABLED=true
+DASHBOARD_DISABLED=true
+AMBIENT_DISABLED=true
+AUTO_HARVEST_DISABLED=true
+ANTHROPIC_STATUS_DISABLED=true
+```
+
+Useful for isolated dev, low-resource environments, or progressive
+rollout.
+
+## v0.6+ — `thoth.config.ts`
+
+In v0.6, Thoth introduces an optional `thoth.config.ts` file as a
+peer to `.env`. Tracked in [SPEC-yaml-dashboard-sync](/specs/).
+
+### Why both?
+
+- **Env vars** are great for: secrets, deployment-specific overrides,
+  conventional 12-factor app behavior
+- **Config files** are great for: structured config (transport
+  selection, persona structure, custom skill paths), type safety,
+  IDE autocomplete, version control of behavioral settings
+
+`thoth.config.ts` will sit *on top of* env vars, not replace them.
+
+### Planned shape (v0.6)
+
+```ts
+import { defineConfig } from '@thoth-runtime/core';
+import slack from '@thoth-runtime/transport-slack';
+
+export default defineConfig({
+  runtime: {
+    sandboxRoot: './sandbox',
+    claudeBin: 'claude',
+    maxTurns: 25,
+    maxBudgetUsd: 5,
+  },
+
+  transport: slack({
+    botToken: process.env.SLACK_BOT_TOKEN!,
+    appToken: process.env.SLACK_APP_TOKEN!,
+    signingSecret: process.env.SLACK_SIGNING_SECRET,
+    allowedUsers: process.env.ALLOWED_USERS?.split(',') ?? [],
+  }),
+
+  persona: {
+    dir: './persona/thoth',
+    aetherRulesPath: './persona/aether/RULES.md',
+  },
+
+  memory: {
+    episodic: {
+      embedder: 'xenova-minilm-l6-v2',
+      retentionDays: 365,
+    },
+    identity: {
+      provider: 'honcho',
+      apiKey: process.env.HONCHO_API_KEY,
+      workspace: process.env.HONCHO_WORKSPACE_ID ?? 'thoth-prod',
+    },
+    reflection: {
+      enabled: true,
+      dailyCapUsd: 5,
+      idleMinutes: 30,
+    },
+  },
+
+  ambient: {
+    triggers: [
+      {
+        name: 'morning_digest',
+        schedule: '0 9 * * *',
+        budgetUsd: 0.50,
+      },
+    ],
+  },
+
+  drains: [
+    {
+      name: 'my-honeycomb',
+      type: 'honeycomb',
+      apiKey: process.env.HONEYCOMB_API_KEY,
+      dataset: 'thoth-prod',
+      streams: ['traces'],
+    },
+  ],
+});
+```
+
+### Two-way sync (v0.6)
+
+The Cloud dashboard reads `thoth.config.ts` and renders it as a
+visual editor. Edits in either surface (file or dashboard) propagate
+to the other. See [SPEC-yaml-dashboard-sync](/specs/) for the
+full design.
+
+### Migration from v0.5 to v0.6
+
+**Backwards compatible.** v0.5 projects with only `.env` continue
+to work in v0.6 — `thoth.config.ts` is opt-in.
+
+When you're ready to migrate:
+
+```bash
+thoth config init        # generates thoth.config.ts from current .env
+```
+
+This produces a `thoth.config.ts` with `process.env.<VAR>` references
+for all your existing settings. You can then progressively move
+configuration into the file.
+
+## Sandbox per-thread
+
+Each Slack thread gets a dedicated sandbox cwd:
+
+```
+<SANDBOX_ROOT>/
+├── C123-1700000000-0/      ← thread 1
+│   └── (claude session state)
+├── C123-1700001234-5/      ← thread 2
+└── ...
+```
+
+The sandbox isolates Claude's working directory per thread —
+file edits in one thread don't affect another. Sandbox dirs are
+created lazily on first turn.
+
+<Aside type="tip" title="Sandbox cleanup">
+Sandbox directories accumulate over time. Add to your operational
+runbook: monthly cleanup of dirs older than your episode-retention
+window. The runtime doesn't auto-clean to avoid surprising you.
+</Aside>
+
+## Persona drift detection
+
+The bridge fingerprints all persona files at session start
+(file mtimes hashed into a single string). If any persona file
+changes mid-session, the next turn:
+
+1. Detects the new fingerprint
+2. Forks the Claude session (effectively `--fork-session`)
+3. Re-injects the updated persona stack via
+   `--append-system-prompt-file`
+
+This is what lets you edit `SOUL.md` and have the agent quietly
+upgrade itself within seconds.
+
+## What's next
+
+- [Environment variables reference](/reference/env/) — every var
+- [CLI reference](/reference/cli/) — every command
+- [Persona stack](/concepts/persona-stack/) — what `PERSONA_DIR` points to

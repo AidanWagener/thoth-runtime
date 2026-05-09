@@ -1,0 +1,60 @@
+{
+  "name": "thoth-runtime-monorepo",
+  "version": "0.5.0",
+  "private": true,
+  "description": "Thoth — open-source lifelong-learning agent runtime. Workspace root.",
+  "license": "MIT",
+  "homepage": "https://thoth-runtime.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thoth-runtime/thoth.git"
+  },
+  "bugs": {
+    "url": "https://github.com/thoth-runtime/thoth/issues"
+  },
+  "keywords": [
+    "agent",
+    "agent-runtime",
+    "ai",
+    "claude",
+    "memory",
+    "lifelong-learning",
+    "slack",
+    "discord",
+    "voyager",
+    "reflexion"
+  ],
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "smoke": "pnpm --filter @thoth-runtime/cli smoke",
+    "verify-clean": "bash scripts/verify-clean-extraction.sh",
+    "changeset": "changeset",
+    "release": "changeset version && changeset publish"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@changesets/cli": "^2.27.10",
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@biomejs/biome",
+      "better-sqlite3",
+      "esbuild",
+      "protobufjs",
+      "sharp"
+    ]
+  }
+}

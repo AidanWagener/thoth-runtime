@@ -1,0 +1,250 @@
+---
+title: Slack setup
+description: Full Slack-app setup walkthrough — from "Create New App" to "the bot replies in Slack" in ~10 minutes.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+Slack is Thoth's primary chat surface in v0.5. (Discord ships in
+v0.6 per [SPEC-discord-transport](/specs/).)
+
+This page is the full setup walkthrough. The [Quickstart](/quickstart/)
+covers it briefly; this page goes deep on each step plus
+configuration options.
+
+## What you'll create
+
+A Slack app installed in your workspace, configured for **Socket
+Mode** (no public ingress; outbound-only WebSocket). The bot
+listens for DMs from allowlisted users + `@`-mentions in
+allowlisted channels.
+
+## Prerequisites
+
+- A Slack workspace where you have admin rights (your own free
+  workspace is fine)
+- Member ID for each user who'll talk to the bot
+
+## Step 1 — Create the app
+
+<Steps>
+
+1. Visit [api.slack.com/apps](https://api.slack.com/apps) → **Create New App**.
+
+2. Choose **From a manifest**.
+
+3. Pick your workspace.
+
+4. Paste the contents of `examples/minimal/manifest.yaml` (or
+   `examples/operator-agent/manifest.yaml` if you used that template).
+
+5. Click **Create**.
+
+</Steps>
+
+The manifest pre-configures all the necessary settings. If you'd
+rather configure manually, the requirements are:
+
+- **App name:** whatever you want (Thoth, Thoth, etc.)
+- **Bot user:** enabled
+- **Bot scopes** (OAuth & Permissions):
+  - `app_mentions:read`
+  - `channels:history`
+  - `chat:write`
+  - `groups:history`
+  - `im:history`
+  - `im:read`
+  - `im:write`
+  - `mpim:history`
+  - `reactions:read`
+  - `users:read`
+- **Event subscriptions** (in Socket Mode — no Request URL needed):
+  - `app_mention`
+  - `message.im`
+  - `reaction_added`
+- **Socket Mode:** enabled
+- **Slash commands** (optional, but recommended):
+  - `/help` — Show capabilities card
+  - `/whoami` — Show current Honcho user model
+  - `/recall` — Search past episodes
+  - `/done` — Close current thread for reflection
+  - `/loop-stop` — Cancel pending self-spawns
+
+## Step 2 — Install to workspace + grab the bot token
+
+<Steps>
+
+1. **OAuth & Permissions** → **Install to Workspace**.
+
+2. Accept the requested scopes.
+
+3. Copy the **Bot User OAuth Token** at the top of the page. It
+   starts with `xoxb-`.
+
+</Steps>
+
+This is your `SLACK_BOT_TOKEN`.
+
+<Aside type="caution" title="Treat this as a secret">
+Anyone with this token can post messages as your bot. Store it in
+`.env` (which is gitignored), never in code, never in chat logs.
+</Aside>
+
+## Step 3 — Generate the app-level token
+
+Socket Mode requires a separate "app-level" token in addition to
+the bot token.
+
+<Steps>
+
+1. **Basic Information** → scroll to **App-Level Tokens**.
+
+2. Click **Generate Token and Scopes**.
+
+3. Name it `socket` (or anything; the name is for your reference).
+
+4. Add the `connections:write` scope.
+
+5. Click **Generate**.
+
+6. Copy the token. It starts with `xapp-`.
+
+</Steps>
+
+This is your `SLACK_APP_TOKEN`.
+
+## Step 4 — Find your member IDs
+
+Each user who can talk to the bot needs to be in `ALLOWED_USERS`
+(comma-separated).
+
+<Steps>
+
+1. In Slack, click your avatar → **Profile**.
+
+2. Click the **⋯** menu → **Copy member ID**.
+
+3. The ID looks like `U01ABC123XYZ`.
+
+4. Repeat for any other users who should have access.
+
+</Steps>
+
+For multiple users:
+
+```bash
+ALLOWED_USERS=U01ABC123XYZ,U02DEF456UVW
+```
+
+## Step 5 — Invite the bot into channels (optional)
+
+DMs work without an invite. For channel mentions:
+
+```
+/invite @thoth
+```
+
+(Substitute your bot's actual handle.)
+
+## Step 6 — Set environment variables
+
+In your project's `.env`:
+
+```bash
+SLACK_BOT_TOKEN=xoxb-your-bot-token-here
+SLACK_APP_TOKEN=xapp-your-app-token-here
+ALLOWED_USERS=U01ABC123XYZ
+```
+
+## Step 7 — Run the bridge
+
+```bash
+pnpm dev
+```
+
+You should see `INFO: thoth online (Socket Mode)` in the logs.
+
+DM the bot. Within a few seconds you should see a streaming reply.
+
+## Magic commands
+
+Once the bot is running, these commands work in any thread:
+
+| Command | What it does |
+|---|---|
+| `/help` | Show a capabilities card with allowlist status + which memory layers are online |
+| `/whoami` | Show Honcho's current representation of you |
+| `/recall <query>` | Top-10 semantic matches across past episodes with Slack permalinks |
+| `/done` | Manually close this thread for reflection (otherwise idle-fires after 30 min) |
+| `/loop-stop` | Cancel any pending self-spawn follow-ups in this thread |
+
+## Reactions on bot replies
+
+| Emoji | Effect |
+|---|---|
+| ✅ | Mark turn `verified=success` |
+| ❌ | Mark turn `verified=failure` |
+| 🧠 | Save the turn verbatim into MEMORY.md (with secret redaction) |
+| 🗑️ | Mark this episode outdated (excluded from future recall) |
+| 👤 | Record as a user-feedback observation in Honcho |
+
+See [Reactions concept](/concepts/reactions/) for the full protocol.
+
+## How sessions work
+
+- **Thread key** = `{channel_id}:{thread_ts}`. Top-level message
+  starts a new thread; replies in the same thread continue the
+  same Claude session.
+- **Sandbox cwd** — each thread gets its own directory under
+  `SANDBOX_ROOT/<sanitized-thread-key>/`.
+- **Persona** — passed as `--append-system-prompt-file` only on the
+  first turn of a thread. Resumed turns skip it (already in session
+  memory).
+- **Persona drift** — if persona file mtimes change mid-thread, the
+  next turn starts a fresh session (effectively `--fork-session`)
+  so the new persona takes effect.
+
+## Configuration reference
+
+All Slack-related env vars:
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `SLACK_BOT_TOKEN` | yes | — | Bot User OAuth Token (`xoxb-...`) |
+| `SLACK_APP_TOKEN` | yes | — | App-Level Token (`xapp-...`) for Socket Mode |
+| `SLACK_SIGNING_SECRET` | no | — | Optional in Socket Mode (events arrive over WebSocket, not HTTP) |
+| `ALLOWED_USERS` | yes | — | Comma-separated Slack member IDs |
+
+## Troubleshooting
+
+### Bot connects but doesn't reply
+
+Three things to check:
+
+1. Is the user's member ID in `ALLOWED_USERS`?
+2. Is the message a DM or `@`-mention? (The bot ignores other
+   channel messages by design.)
+3. For channel mentions: is the bot invited to that channel?
+
+### "missing scope" errors in logs
+
+The Slack manifest includes all required scopes. If you've modified
+the manifest or set up scopes manually, ensure all required scopes
+from Step 1 are granted, then re-install the app.
+
+### Streaming replies feel slow
+
+The bridge updates the Slack message every ~1 second via
+`chat.update` polling. This is intentional — Slack's
+`chat.startStream` API is newer and not on all workspace tiers.
+
+### Bot stops responding mid-session
+
+Most common cause: the `claude` subprocess exited unexpectedly.
+Check logs at `LOG_LEVEL=debug` to see the stderr.
+
+## What's next
+
+- [Memory architecture](/concepts/memory/) — what the bot remembers
+- [Persona stack](/concepts/persona-stack/) — how to customize the bot's identity
+- [Reactions](/concepts/reactions/) — the training-signal protocol

@@ -1,0 +1,211 @@
+---
+title: Reflection at session-end
+description: The Reflexion-style critique that fans out to four writers and turns single sessions into durable wisdom.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+When a session ends, Thoth doesn't just close the connection. It
+**runs a reflection** — a structured self-critique that propagates
+back into four memory layers.
+
+This is the difference between an agent that *accumulates facts* and
+an agent that *accumulates wisdom*.
+
+## The Reflexion pattern
+
+[Reflexion](https://arxiv.org/abs/2303.11366) (Shinn et al., 2023)
+proposed that LLM agents can improve via *verbal* self-feedback —
+critiquing their own output, storing the critique, and consulting it
+on the next attempt. No weight updates required.
+
+Thoth applies Reflexion at the session boundary. After each session:
+
+1. Spawn a fresh `claude -p --effort low --output-format json`
+   subprocess
+2. Pass the full transcript as input
+3. Ask the model to emit structured JSON describing what worked,
+   what didn't, what should change
+4. Parse + validate the JSON
+5. Fan out to four writers
+
+## When does it run
+
+A reflection fires at session end. "Session end" means **whichever
+comes first**:
+
+- **`/done` slash command** — explicit close
+- **30 minutes of idle** — auto-detect via the idle poller (60s tick)
+- **Daily cap exceeded** — if `REFLECTION_DAILY_CAP_USD` is reached,
+  reflections defer until next UTC day
+
+## The reflection JSON shape
+
+The reflection subprocess emits this structure (parsed via zod —
+see [`reflection/parser.ts`](https://github.com/thoth-runtime/thoth/blob/main/packages/core/src/reflection/parser.ts)):
+
+```json
+{
+  "outcome": "success" | "partial" | "failure",
+  "what_worked": "string | null",
+  "what_didnt": "string | null",
+  "should_skill": false,
+  "skill_slug": "string | null",
+  "skill_description": "string | null",
+  "skill_body": "string | null",
+  "memory_notes": ["string", ...],
+  "persona_observations": ["string", ...],
+  "next_check_at": "ISO 8601 timestamp | null",
+  "user_model_updates": {
+    "U_PEER_ID": ["observation 1", "observation 2"]
+  }
+}
+```
+
+Each field maps to a writer.
+
+## The four writers
+
+```
+                  reflection JSON
+                         │
+       ┌─────────────────┼─────────────────┐
+       │                 │                 │                 │
+       ▼                 ▼                 ▼                 ▼
+   memory writer    skill writer   persona writer    Honcho writer
+       │                 │                 │                 │
+       ▼                 ▼                 ▼                 ▼
+    MEMORY.md       SKILL.md        Slack DM         Honcho ingest
+```
+
+### 1. Memory writer
+
+Appends `memory_notes` to your `MEMORY.md` file with secret
+redaction.
+
+The redaction pass scans for known secret patterns (Slack tokens,
+GitHub PATs, API keys, env-style `*_SECRET` patterns) and replaces
+matches with `[REDACTED:<kind>]` before writing.
+
+```markdown
+# (appended at end of MEMORY.md)
+
+- 2026-05-09: Cherry-picks staging→main work; never merge.
+- 2026-05-09: When Sentry says "duplicate key value violates unique
+  constraint", check `audit_user_idempotency` table first.
+- 2026-05-09: the operator's API key for `sentry.io` is [REDACTED:env-secret].
+```
+
+The MEMORY.md file is fingerprinted at session start; changes are
+detected on the next session and the new content is in context.
+
+### 2. Skill draft writer
+
+If `should_skill: true`, writes a proposed `SKILL.md` to
+`.claude/skills/<slug>/` and posts an approval card to your Slack
+DM.
+
+You ✅ to commit it to your repo, ❌ to delete the draft. See
+[Skills](/concepts/skills/) for the full flow.
+
+### 3. Persona observation writer
+
+DMs founders **candidate** observations about their own behavior
+(or the bot's). **Never auto-applies.**
+
+Example DM:
+
+> 🪶 Reflection observation:
+>
+> "User has consistently used 'lol' to indicate surprise rather
+> than humor across 7+ sessions. Consider noting this in USER.md
+> if accurate."
+>
+> 🧠 = save to USER.md · ❌ = dismiss
+
+Auto-applying persona changes is too risky (one bad reflection
+could rewrite your agent's personality). The DM-then-✅ flow keeps
+human judgment in the loop.
+
+### 4. Honcho writer
+
+Feeds `user_model_updates` back into Honcho's identity layer as
+**Thoth-authored observations**. These are tagged differently from
+Honcho's own deriver observations so the dialectic system knows
+they came from reflection rather than direct ingest.
+
+This closes the loop: a session reveals something about a peer →
+reflection synthesizes it → Honcho stores it → next session's
+Dialectic call surfaces it as relevant context.
+
+## Cost economics
+
+Each reflection costs ~$0.10–$0.50 depending on transcript length.
+
+- Per-session cap: `REFLECTION_MAX_BUDGET_USD` (default $0.50)
+- Daily cap: `REFLECTION_DAILY_CAP_USD` (default $5.00)
+- Effort flag: `--effort low` keeps the reflection model on Haiku-class
+
+For a typical user with 5–10 sessions per day, reflection costs
+~$1–2/day.
+
+## What if reflection fails?
+
+The reflection JSON parser is forgiving:
+
+- Strips `\`\`\`json` fences and prose around the JSON
+- Recovers from incomplete JSON via largest-object extraction
+- Validates against zod schema with normalization
+- Rejects entire reflection if banned keywords appear (one of the
+  hard guards)
+
+If parsing fails after recovery attempts, the reflection is logged
+and skipped. **The session is still successfully closed**; just no
+writes happen this time. Next session's reflection will pick up
+the slack.
+
+## The banned-keyword guard
+
+The parser rejects reflections containing certain keywords as a
+safety mechanism. Currently banned:
+
+- `hermes`, `openclaw`, `nanoclaw`, `claw` (precursor project names)
+
+This prevents historical project references from leaking into your
+agent's memory if they happen to appear in transcripts.
+
+## Reflection observability
+
+The dashboard's **Akashic Records** tab shows every reflection that
+has run, with:
+
+- Session reference
+- Cost
+- Duration
+- Outcome (success/partial/failure)
+- Counts of fan-out writes (memory notes, skill drafts, persona
+  observations, Honcho updates)
+- Drill-down into the raw JSON
+
+## Disabling reflection
+
+If you don't want reflection running:
+
+```bash
+REFLECTION_DISABLED=true
+```
+
+Use cases:
+
+- Local development (don't want skill drafts cluttering your inbox)
+- Highly cost-sensitive deployments
+- Pre-launch testing where you want clean memory
+
+You can re-enable later; existing data is preserved.
+
+## What's next
+
+- [The 5-layer memory stack](/concepts/memory/) — reflection is L5
+- [Skills](/concepts/skills/) — what `should_skill: true` produces
+- [Reactions](/concepts/reactions/) — what feeds reflection
+- [Persona stack](/concepts/persona-stack/) — what MEMORY.md looks like

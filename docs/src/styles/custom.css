@@ -1,0 +1,31 @@
+/* Thoth docs — custom theme overrides
+ * Lapis blue + Egyptian gold + cream palette
+ */
+
+:root {
+  --sl-color-accent-low: #1e3a8a33;
+  --sl-color-accent: #1e3a8a;
+  --sl-color-accent-high: #d4af37;
+
+  --sl-color-text-accent: #d4af37;
+
+  --sl-color-bg-nav: #1a1a1a;
+  --sl-color-bg-sidebar: #1a1a1a;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #1e3a8a22;
+  --sl-color-accent: #1e3a8a;
+  --sl-color-accent-high: #d4af37;
+  --sl-color-text-accent: #1e3a8a;
+}
+
+/* Typographic touches */
+h1, h2, h3 {
+  font-family: 'Cinzel', 'Playfair Display', Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+code, pre, .sl-markdown-content code {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}

@@ -1,0 +1,50 @@
+{
+  "schema_version": "agentskills.io/v1",
+  "name": "sentry-triage",
+  "version": "1.2.0",
+  "title": "Sentry Triage",
+  "description": "Triage recent Sentry issues for the Helios production project, group by severity + frequency, propose actions",
+  "author": "@operator-agent-example",
+  "license": "MIT",
+  "tags": ["ops", "sentry", "triage", "incident-response"],
+  "language": "en",
+  "entry": "SKILL.md",
+  "tools_allowed": ["Read", "WebFetch", "Bash"],
+  "context": "fork",
+  "thoth": {
+    "persona": "thoth",
+    "required_layers": ["episodic", "procedural"],
+    "estimated_cost_usd": 0.08,
+    "execution_environment": {
+      "sandbox": true,
+      "max_runtime_seconds": 30,
+      "max_cost_usd": 0.20
+    },
+    "evolution_history": [
+      {
+        "version": "1.0.0",
+        "parent": null,
+        "mutation": null,
+        "reason": "Initial skill compiled by reflection from 4 successful triage sessions",
+        "reward_delta": null,
+        "created_at": "2026-04-15"
+      },
+      {
+        "version": "1.1.0",
+        "parent": "1.0.0",
+        "mutation": "refine",
+        "reason": "Reaction-driven: 8 ✓ vs 1 ✗ over 30d → tightened severity heuristic",
+        "reward_delta": 0.34,
+        "created_at": "2026-04-30"
+      },
+      {
+        "version": "1.2.0",
+        "parent": "1.1.0",
+        "mutation": "compose",
+        "reason": "Composed with @operator-agent-example/jira-link skill to auto-link issues to tickets",
+        "reward_delta": 0.12,
+        "created_at": "2026-05-08"
+      }
+    ]
+  }
+}

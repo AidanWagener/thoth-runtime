@@ -1,0 +1,89 @@
+---
+title: Webhook transport (v0.6+)
+description: Generic HTTP webhook transport for custom integrations. Coming in v0.6+.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Coming v0.6+">
+Webhook transport ships after Discord (v0.6) — likely v0.7 or v0.8.
+This page is a forward-looking placeholder.
+</Aside>
+
+## What it is
+
+A generic HTTP webhook transport for integrating Thoth with anything that
+can send + receive HTTP. Use cases:
+
+- **Custom chat surfaces** (your own chat UI, bespoke internal tools)
+- **Email gateways** (incoming email → bot reply by email)
+- **SMS/WhatsApp gateways** via Twilio / equivalent
+- **Voice-to-text gateways** for speech interfaces
+- **External system events** (a CI pipeline failure triggers a Thoth reply
+  posted back to PagerDuty)
+
+Anything that can `POST` JSON and `GET` a webhook URL can integrate with
+Thoth via this transport.
+
+## Planned interface
+
+```ts
+import webhook from '@thoth-runtime/transport-webhook';
+
+export default defineConfig({
+  transport: webhook({
+    inboundPort: 8788,             // Thoth listens for incoming events
+    inboundPath: '/inbound',
+    inboundSecret: process.env.WEBHOOK_INBOUND_SECRET,  // HMAC verification
+
+    outboundUrl: process.env.WEBHOOK_OUTBOUND_URL,      // Where Thoth POSTs replies
+    outboundAuth: { type: 'bearer', token: process.env.WEBHOOK_OUTBOUND_TOKEN },
+
+    eventMapping: {
+      // Your incoming JSON shape → Thoth's IncomingMessage
+      threadKey: '$.session_id',
+      peerId: '$.user_id',
+      text: '$.message',
+    },
+
+    replyMapping: {
+      // Thoth's reply → your outgoing webhook payload
+      session_id: '$.threadKey',
+      reply: '$.text',
+      cost_usd: '$.costUsd',
+    },
+  }),
+});
+```
+
+JSONPath-style mapping lets you bridge to almost any webhook contract
+without writing transport code.
+
+## Reactions in webhook
+
+Without reactions, you lose the training-signal protocol. Three options:
+
+1. **Skip reactions** — accept the loss (simpler integrations don't need them)
+2. **Map a reaction protocol** — e.g., HTTP status code 200/451 maps to ✅/❌
+3. **Pair with another transport** — your webhook handles the conversation, Slack handles reactions
+
+## Security
+
+- HMAC-SHA256 signature verification on every inbound event
+- Allowlist of inbound IP ranges (optional)
+- Bearer token auth for outbound POSTs
+- Rate limiting per peer + per session
+
+## Why deferred
+
+The Slack and Discord transports cover ~95% of agent use cases. Webhook
+is a power-user feature whose payoff is high but volume is low.
+Shipping it well requires care (auth, retries, ordering guarantees) that
+v0.6 launch doesn't have time for.
+
+## What's next
+
+- [Slack setup](/transports/slack/) — what currently works
+- [Discord transport](/transports/discord/) — coming v0.6
+- [SPEC-discord-transport](/specs/) — the v0.6 transport refactor that
+  unblocks all alternative transports

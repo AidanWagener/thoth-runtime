@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build artifacts
+dist/
+build/
+*.tsbuildinfo
+.next/
+out/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# SQLite databases (runtime)
+*.db
+*.db-shm
+*.db-wal
+
+# Sandbox state (per-thread cwd dirs)
+sandbox/
+runtime/sandbox/
+
+# Persona stack files at runtime (not source)
+runtime/persona/
+
+# Changeset working files
+.changeset/*.md
+!.changeset/README.md
+!.changeset/config.json
+
+# Editor + system
+*.tmp
+*.bak
+.cache/
+
+# Astro
+.astro/
+
+# Local OS
+.DS_Store
+ehthumbs.db
+Thumbs.db

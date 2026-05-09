@@ -1,0 +1,19 @@
+{
+  "name": "@thoth-runtime/transport-slack",
+  "version": "0.5.0",
+  "description": "Slack transport — placeholder. v0.5 collapses Slack into @thoth-runtime/core; v0.6 splits this out as a peer package per SPEC-discord-transport.",
+  "license": "MIT",
+  "private": true,
+  "type": "commonjs",
+  "homepage": "https://thoth-runtime.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thoth-runtime/thoth.git",
+    "directory": "packages/transport-slack"
+  },
+  "scripts": {
+    "build": "echo 'transport-slack is a placeholder in v0.5 — Slack code lives in @thoth-runtime/core. Splits in v0.6.' && exit 0",
+    "typecheck": "echo 'no sources yet' && exit 0",
+    "test": "echo 'no tests yet' && exit 0"
+  }
+}

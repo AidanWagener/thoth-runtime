@@ -1,0 +1,263 @@
+---
+title: CLI reference
+description: Every Thoth CLI command, every flag, every option.
+---
+
+The `thoth` CLI is the entry point for all operational tasks.
+
+## Installation
+
+The CLI is bundled with `@thoth-runtime/cli`. Globally:
+
+```bash
+pnpm add -g @thoth-runtime/cli
+thoth --version  # 0.5.0
+```
+
+Project-local (recommended for new projects):
+
+```bash
+npx @thoth-runtime/cli init my-project
+```
+
+## Commands
+
+### `thoth init [dir]`
+
+Scaffold a new Thoth project.
+
+```bash
+npx @thoth-runtime/cli init my-thoth
+```
+
+Interactive prompts:
+
+- **Template** — `minimal` (default) | `operator-agent` | `multi-llm-party` (stub)
+- **Project name** — used for npm package name
+- **Persona structure** — `single-stack` (just `thoth/`) | `dual-stack` (`thoth/` + `aether/`)
+
+Generates a directory containing:
+
+```
+my-thoth/
+├── package.json
+├── thoth.config.ts
+├── .env.example
+├── persona/
+│   └── thoth/
+│       ├── IDENTITY.md
+│       └── SOUL.md
+└── README.md
+```
+
+### `thoth start`
+
+Run the bridge in production mode.
+
+```bash
+thoth start
+```
+
+Reads config from `thoth.config.ts` + `.env`. Refuses to start if
+any of `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, or the
+Bedrock/Vertex/Foundry env vars are set (would override Max
+subscription billing).
+
+### `thoth dev`
+
+Watch mode. Restarts on file change.
+
+```bash
+thoth dev
+```
+
+Equivalent to `tsx watch src/index.ts start`. Useful while editing
+your persona stack — changes hot-reload on next session.
+
+### `thoth doctor`
+
+Validate environment + dependencies.
+
+```bash
+thoth doctor
+```
+
+Checks:
+- Node version (≥20)
+- pnpm version
+- `claude` CLI on PATH and logged in
+- No banned env vars set
+- Sandbox directory writable
+- Network reachability of Slack + Honcho + claude CLI's auth endpoint
+
+Use this before opening a support ticket.
+
+### `thoth smoke`
+
+Run the full pipeline test against your real `claude` install.
+
+```bash
+thoth smoke
+```
+
+What it does:
+
+1. Spawns `claude` with the persona stack
+2. Sends a test prompt
+3. Verifies stream-json parsing
+4. Asserts persona is honored (looks for a configured marker in the response)
+5. Resumes the same session in a second turn to prove thread continuity
+
+If `pnpm smoke` passes, the only remaining failure mode in
+production is the Slack transport.
+
+### `thoth migrate`
+
+Run pending SQLite schema migrations.
+
+```bash
+thoth migrate
+```
+
+Migrations are idempotent and additive. Running on an up-to-date
+database is a no-op.
+
+### `thoth memory <subcommand>`
+
+Inspect and manage memory.
+
+#### `thoth memory list`
+
+List recent episodes.
+
+```bash
+thoth memory list --limit 10
+```
+
+#### `thoth memory recall <query>`
+
+Search past episodes by semantic similarity.
+
+```bash
+thoth memory recall "cherry-picks staging to main"
+thoth memory recall "Sentry triage" --top-k 5 --min-score 0.5
+```
+
+Flags:
+- `--top-k <n>` — number of results (default 3)
+- `--min-score <0–1>` — minimum cosine similarity (default 0.45)
+- `--peer <id>` — restrict to one peer's episodes
+
+#### `thoth memory export`
+
+Export all memory as a GDPR-compliant ZIP.
+
+```bash
+thoth memory export --out ./memory-export.zip
+```
+
+#### `thoth memory delete --since <date>`
+
+Permanently delete episodes since a date.
+
+```bash
+thoth memory delete --since 2026-01-01 --confirm
+```
+
+### `thoth skill <subcommand>`
+
+Manage your skill library.
+
+#### `thoth skill list`
+
+```bash
+thoth skill list
+```
+
+Shows all installed skills with name, version, source.
+
+#### `thoth skill validate <skill-dir>`
+
+Validate a skill against `agentskills.io/v1` schema.
+
+```bash
+thoth skill validate ./.claude/skills/sentry-triage
+```
+
+#### `thoth skill install @author/skill-name`
+
+Install a skill from the marketplace (when v1 ships) or from a path.
+
+```bash
+thoth skill install @operator-agent/sentry-triage
+thoth skill install ./local-skill-dir
+```
+
+#### `thoth skill export <slug> --format <agentskills|thoth>`
+
+Export a skill for cross-ecosystem use.
+
+```bash
+thoth skill export sentry-triage --format agentskills --out skill.tar.gz
+```
+
+### `thoth config <subcommand>`
+
+#### `thoth config show`
+
+Print the current resolved configuration (with secrets redacted).
+
+```bash
+thoth config show
+```
+
+#### `thoth config validate`
+
+Validate `thoth.config.ts` without starting the bridge.
+
+```bash
+thoth config validate
+```
+
+### `thoth drains <subcommand>` (v0.6+)
+
+Manage observability drains. Coming in v0.6 per
+[SPEC-drains](/specs/).
+
+## Global flags
+
+These work with any command:
+
+| Flag | Description |
+|---|---|
+| `--version` | Print version and exit |
+| `--help` | Show help for the command |
+| `--config <path>` | Override default `thoth.config.ts` location |
+| `--env <path>` | Override default `.env` location |
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| 0 | Success |
+| 1 | General error (config invalid, etc.) |
+| 2 | Auth probe refused (banned env var present) |
+| 3 | `claude` CLI not found / not logged in |
+| 4 | SQLite migration failed |
+| 5 | Slack connection failed |
+| 64 | Usage error (CLI flag wrong) |
+
+## Environment variables
+
+The CLI respects these globally:
+
+| Variable | Default | Description |
+|---|---|---|
+| `LOG_LEVEL` | `info` | One of `debug`, `info`, `warn`, `error` |
+| `NO_COLOR` | unset | If set, disable ANSI colors in output |
+| `THOTH_NO_TELEMETRY` | unset | Disable any telemetry the CLI might add (currently none) |
+
+## What's next
+
+- [Configuration reference](/reference/config/) — every `thoth.config.ts` option
+- [Environment variables reference](/reference/env/) — every env var

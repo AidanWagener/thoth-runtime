@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thoth — The lifelong-learning agent runtime</title>
+    <meta
+      name="description"
+      content="Open-source MIT-licensed agent runtime with five-layer memory, Reflexion at session-end, Voyager-style skill compilation, and multi-agent debate. Built in Frankfurt."
+    />
+    <meta name="theme-color" content="#1E3A8A" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Thoth — The lifelong-learning agent runtime" />
+    <meta property="og:description" content="Open-source agent runtime with five-layer memory, reflection, Voyager-style skills, multi-agent debate. MIT-licensed. Built in Frankfurt." />
+    <meta property="og:url" content="https://thoth-runtime.dev" />
+    <meta property="og:image" content="/og-image.png" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@thothruntime" />
+    <meta name="twitter:title" content="Thoth — The lifelong-learning agent runtime" />
+    <meta name="twitter:description" content="Open-source agent runtime with five-layer memory, reflection, Voyager-style skills, multi-agent debate. MIT-licensed." />
+    <meta name="twitter:image" content="/og-image.png" />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      :root {
+        --lapis: #1e3a8a;
+        --lapis-bright: #2d4eb1;
+        --gold: #d4af37;
+        --gold-bright: #e6c350;
+        --cream: #f5e6d3;
+        --charcoal: #1a1a1a;
+        --charcoal-soft: #2a2a2a;
+        --charcoal-line: #3a3a3a;
+        --verdigris: #3d8b6e;
+        --text: #f5e6d3;
+        --text-dim: rgba(245, 230, 211, 0.7);
+        --text-faint: rgba(245, 230, 211, 0.4);
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      html { font-size: 16px; scroll-behavior: smooth; }
+
+      body {
+        background: var(--charcoal);
+        color: var(--text);
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        line-height: 1.6;
+        font-feature-settings: 'liga' 1, 'kern' 1;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      h1, h2, h3, h4 {
+        font-family: 'Cinzel', Georgia, serif;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        line-height: 1.2;
+      }
+
+      code, pre, .mono {
+        font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+      }
+
+      /* Layout */
+      .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+      section { padding: 80px 0; }
+      section + section { border-top: 1px solid var(--charcoal-line); }
+
+      /* Header */
+      header {
+        position: sticky; top: 0; z-index: 100;
+        background: rgba(26, 26, 26, 0.92);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--charcoal-line);
+      }
+      .nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 60px;
+      }
+      .brand {
+        font-family: 'Cinzel', serif;
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: var(--gold);
+        text-decoration: none;
+        letter-spacing: 0.08em;
+      }
+      .nav-links {
+        display: flex;
+        gap: 32px;
+        align-items: center;
+      }
+      .nav-links a {
+        color: var(--text-dim);
+        text-decoration: none;
+        font-size: 0.95rem;
+        transition: color 0.15s;
+      }
+      .nav-links a:hover { color: var(--text); }
+      .nav-cta {
+        padding: 8px 18px;
+        background: var(--gold);
+        color: var(--charcoal);
+        border-radius: 4px;
+        font-weight: 600;
+      }
+      .nav-cta:hover { background: var(--gold-bright); color: var(--charcoal); }
+
+      /* Hero */
+      .hero {
+        padding: 120px 0 100px;
+        text-align: center;
+        background:
+          radial-gradient(ellipse at top, rgba(30, 58, 138, 0.15) 0%, transparent 50%),
+          radial-gradient(ellipse at bottom, rgba(212, 175, 55, 0.05) 0%, transparent 60%);
+      }
+      .hero h1 {
+        font-size: clamp(2.5rem, 6vw, 4.5rem);
+        margin-bottom: 24px;
+        letter-spacing: 0.04em;
+      }
+      .hero h1 .gold { color: var(--gold); }
+      .hero .tagline {
+        font-size: clamp(1.1rem, 1.8vw, 1.4rem);
+        color: var(--text-dim);
+        max-width: 720px;
+        margin: 0 auto 48px;
+      }
+      .hero-quote {
+        font-style: italic;
+        color: var(--text-faint);
+        font-size: 0.95rem;
+        max-width: 600px;
+        margin: 0 auto 48px;
+        padding: 0 24px;
+        border-left: 2px solid var(--gold);
+        text-align: left;
+      }
+      .cta-row {
+        display: flex;
+        gap: 16px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .cta {
+        padding: 14px 32px;
+        border-radius: 6px;
+        font-weight: 600;
+        text-decoration: none;
+        font-size: 1rem;
+        transition: transform 0.1s, background 0.15s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .cta:active { transform: translateY(1px); }
+      .cta-primary {
+        background: var(--gold);
+        color: var(--charcoal);
+      }
+      .cta-primary:hover { background: var(--gold-bright); }
+      .cta-secondary {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--charcoal-line);
+      }
+      .cta-secondary:hover { background: var(--charcoal-soft); border-color: var(--gold); }
+
+      .install {
+        margin-top: 48px;
+        display: inline-block;
+        padding: 14px 28px;
+        background: var(--charcoal-soft);
+        border: 1px solid var(--charcoal-line);
+        border-radius: 6px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.95rem;
+        color: var(--gold);
+      }
+      .install::before { content: '$ '; color: var(--text-faint); }
+
+      /* Section headers */
+      h2.section-title {
+        font-size: clamp(1.75rem, 3.5vw, 2.5rem);
+        margin-bottom: 16px;
+        text-align: center;
+      }
+      .section-subtitle {
+        text-align: center;
+        color: var(--text-dim);
+        max-width: 640px;
+        margin: 0 auto 56px;
+        font-size: 1.05rem;
+      }
+
+      /* Five-layer memory section */
+      .memory-stack {
+        max-width: 760px;
+        margin: 0 auto;
+        background: var(--charcoal-soft);
+        border: 1px solid var(--charcoal-line);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .layer {
+        padding: 24px 28px;
+        border-bottom: 1px solid var(--charcoal-line);
+        display: grid;
+        grid-template-columns: 80px 1fr;
+        gap: 24px;
+        align-items: baseline;
+      }
+      .layer:last-child { border-bottom: none; }
+      .layer .num {
+        font-family: 'Cinzel', serif;
+        font-size: 1.5rem;
+        color: var(--gold);
+        letter-spacing: 0.05em;
+      }
+      .layer h3 {
+        font-family: 'Cinzel', serif;
+        font-size: 1.15rem;
+        color: var(--text);
+        margin-bottom: 6px;
+        font-weight: 500;
+      }
+      .layer p {
+        color: var(--text-dim);
+        font-size: 0.95rem;
+      }
+
+      /* Features grid */
+      .features {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 24px;
+      }
+      .feature {
+        padding: 28px;
+        background: var(--charcoal-soft);
+        border: 1px solid var(--charcoal-line);
+        border-radius: 8px;
+        transition: border-color 0.2s;
+      }
+      .feature:hover { border-color: var(--gold); }
+      .feature h3 {
+        font-size: 1.2rem;
+        margin-bottom: 12px;
+        color: var(--gold);
+      }
+      .feature p { color: var(--text-dim); font-size: 0.95rem; }
+
+      /* Comparison */
+      .comparison {
+        max-width: 900px;
+        margin: 0 auto;
+        background: var(--charcoal-soft);
+        border: 1px solid var(--charcoal-line);
+        border-radius: 8px;
+        padding: 32px;
+      }
+      .compare-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 32px;
+        padding: 16px 0;
+        border-bottom: 1px solid var(--charcoal-line);
+      }
+      .compare-row:last-child { border-bottom: none; }
+      .compare-row h4 {
+        font-family: 'Inter', sans-serif;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--text-dim);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .compare-row p { color: var(--text); font-size: 0.95rem; }
+      .compare-row p.us { color: var(--gold); }
+
+      /* Pricing teaser */
+      .pricing {
+        text-align: center;
+      }
+      .price-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 20px;
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+      .price-card {
+        padding: 32px 24px;
+        background: var(--charcoal-soft);
+        border: 1px solid var(--charcoal-line);
+        border-radius: 8px;
+      }
+      .price-card.featured { border-color: var(--gold); }
+      .price-card h3 {
+        font-family: 'Cinzel', serif;
+        font-size: 1.2rem;
+        margin-bottom: 8px;
+      }
+      .price-card .amount {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--gold);
+        margin-bottom: 8px;
+      }
+      .price-card .amount .period { font-size: 0.9rem; color: var(--text-dim); font-weight: 400; }
+      .price-card ul {
+        list-style: none;
+        text-align: left;
+        margin-top: 20px;
+        font-size: 0.92rem;
+        color: var(--text-dim);
+      }
+      .price-card ul li {
+        padding: 6px 0;
+        padding-left: 20px;
+        position: relative;
+      }
+      .price-card ul li::before {
+        content: '✓';
+        position: absolute;
+        left: 0;
+        color: var(--gold);
+      }
+
+      /* Footer */
+      footer {
+        padding: 60px 0 40px;
+        border-top: 1px solid var(--charcoal-line);
+      }
+      .footer-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr 1fr;
+        gap: 48px;
+        margin-bottom: 40px;
+      }
+      footer h4 {
+        font-family: 'Inter', sans-serif;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-faint);
+        margin-bottom: 16px;
+      }
+      footer ul { list-style: none; }
+      footer ul li { padding: 4px 0; }
+      footer a {
+        color: var(--text-dim);
+        text-decoration: none;
+        font-size: 0.95rem;
+      }
+      footer a:hover { color: var(--gold); }
+      .footer-brand .brand { display: inline-block; margin-bottom: 12px; }
+      .footer-brand p { color: var(--text-dim); font-size: 0.9rem; max-width: 320px; }
+      .footer-bottom {
+        padding-top: 24px;
+        border-top: 1px solid var(--charcoal-line);
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 16px;
+        font-size: 0.85rem;
+        color: var(--text-faint);
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        .nav-links { gap: 16px; }
+        .nav-links a:not(.nav-cta) { display: none; }
+        .layer { grid-template-columns: 60px 1fr; gap: 16px; }
+        .compare-row { grid-template-columns: 1fr; gap: 12px; }
+        .footer-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <div class="container nav">
+        <a href="/" class="brand">THOTH</a>
+        <nav class="nav-links">
+          <a href="#memory">Memory</a>
+          <a href="#features">Features</a>
+          <a href="#pricing">Pricing</a>
+          <a href="https://docs.thoth-runtime.dev">Docs</a>
+          <a href="https://github.com/thoth-runtime/thoth">GitHub</a>
+          <a href="https://app.thoth-runtime.dev/signup" class="nav-cta">Sign up</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="container">
+          <h1>The lifelong-learning <span class="gold">agent runtime</span></h1>
+          <p class="tagline">
+            Open-source. MIT-licensed. Five-layer composed memory.
+            Reflexion at session-end. Voyager-style skill compilation.
+            Multi-agent debate. Built in Frankfurt.
+          </p>
+
+          <blockquote class="hero-quote">
+            Thoth — Egyptian god of writing, wisdom, and the moon.
+            Patron of scribes. Recorder of words. Weighed each soul
+            against a feather and wrote the verdict.
+          </blockquote>
+
+          <div class="cta-row">
+            <a class="cta cta-primary" href="https://docs.thoth-runtime.dev/quickstart">
+              Quickstart →
+            </a>
+            <a class="cta cta-secondary" href="https://github.com/thoth-runtime/thoth">
+              View on GitHub
+            </a>
+          </div>
+
+          <div class="install">npx @thoth-runtime/cli init my-thoth</div>
+        </div>
+      </section>
+
+      <section id="memory">
+        <div class="container">
+          <h2 class="section-title">Memory composes in five layers</h2>
+          <p class="section-subtitle">
+            Each layer has its own writer, its own cadence, its own kind of truth.
+            None can collapse into the others without losing what makes a mind
+            a mind.
+          </p>
+
+          <div class="memory-stack">
+            <div class="layer">
+              <span class="num">L5</span>
+              <div>
+                <h3>Reflection</h3>
+                <p>Reflexion at session-end with four fan-out writers (memory, skill drafts, persona observations, Honcho updates). Founder-gated; nothing auto-applies.</p>
+              </div>
+            </div>
+            <div class="layer">
+              <span class="num">L4</span>
+              <div>
+                <h3>Procedural</h3>
+                <p>Skills, persona files, hard rules. Voyager-style skill compilation: patterns recur, become candidates, you approve with a single reaction.</p>
+              </div>
+            </div>
+            <div class="layer">
+              <span class="num">L3</span>
+              <div>
+                <h3>Episodic</h3>
+                <p>Cosine recall over local Xenova embeddings (384-dim, ~50ms/encode, $0/encode). Top-3 related episodes inject as context on every new thread.</p>
+              </div>
+            </div>
+            <div class="layer">
+              <span class="num">L2</span>
+              <div>
+                <h3>Identity</h3>
+                <p>Theory-of-mind on each peer via Honcho. Workspace · Peer · Session · Message — relational facts that evolve across all conversations.</p>
+              </div>
+            </div>
+            <div class="layer">
+              <span class="num">L1</span>
+              <div>
+                <h3>Working</h3>
+                <p>Current session state. Auto-managed by the model itself via the CLAUDE.md file pattern.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="features">
+        <div class="container">
+          <h2 class="section-title">What ships in v0.5</h2>
+          <p class="section-subtitle">
+            A composed runtime, not a library. Opinions on layering, reflection, skill evolution.
+          </p>
+
+          <div class="features">
+            <div class="feature">
+              <h3>Reflexion at session-end</h3>
+              <p>Every session ends with a reflection step. JSON output fans out to four writers — memory, skill drafts, persona observations, Honcho. Founder-gated; nothing auto-applies.</p>
+            </div>
+            <div class="feature">
+              <h3>Voyager-style skills</h3>
+              <p>Patterns that recur become candidate skills. Approve with a single ✅ reaction. Skill genealogy + RL refinement land in v0.6.</p>
+            </div>
+            <div class="feature">
+              <h3>Reactions as training signals</h3>
+              <p>✅❌🧠🗑️👤 on bot replies feed reflection, skill drafts, identity model updates. The chat surface is the labelling surface.</p>
+            </div>
+            <div class="feature">
+              <h3>Multi-agent council</h3>
+              <p>Convene a party of personas to debate a question. v0.5 homogeneous; v0.6 mixes models — Mary on GPT-5, John on Claude Opus, Winston on Gemini.</p>
+            </div>
+            <div class="feature">
+              <h3>Mythic dashboard</h3>
+              <p>Tree of Life, Akashic Records, Council, Firmament, 3D Cosmos. Every internal state inspectable. Every decision auditable.</p>
+            </div>
+            <div class="feature">
+              <h3>Slack-native</h3>
+              <p>The chat surface IS the agent surface. Threaded sessions, magic commands, ephemeral debug. Discord ships Q3.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="container">
+          <h2 class="section-title">vs. agent libraries</h2>
+          <p class="section-subtitle">
+            LangChain, Letta, Mem0, CrewAI are libraries. Thoth is a runtime.
+          </p>
+
+          <div class="comparison">
+            <div class="compare-row">
+              <div>
+                <h4>LangChain / CrewAI</h4>
+                <p>Stateless by default. You assemble the architecture per project.</p>
+              </div>
+              <div>
+                <h4>Thoth</h4>
+                <p class="us">Stateful by design. Architecture ships with opinions on layering, reflection, skill evolution.</p>
+              </div>
+            </div>
+            <div class="compare-row">
+              <div>
+                <h4>Letta / Mem0</h4>
+                <p>Memory libraries. You wire the rest yourself.</p>
+              </div>
+              <div>
+                <h4>Thoth</h4>
+                <p class="us">Five composed layers + reflection + skills + multi-agent + chat-native UX as one organism.</p>
+              </div>
+            </div>
+            <div class="compare-row">
+              <div>
+                <h4>Devin / Cursor / Replit Agents</h4>
+                <p>Closed runtimes. Architecture lives inside one company's walls.</p>
+              </div>
+              <div>
+                <h4>Thoth</h4>
+                <p class="us">Open-source MIT runtime. Closed pieces are Cloud + marketplace; the architecture is yours.</p>
+              </div>
+            </div>
+            <div class="compare-row">
+              <div>
+                <h4>Anthropic Claude Skills / OpenAI Agents SDK</h4>
+                <p>Vendor-specific. Locked to one provider's models.</p>
+              </div>
+              <div>
+                <h4>Thoth</h4>
+                <p class="us">Multi-model. Subscription-billing-friendly via local Claude CLI delegation. Mixes providers in v0.6 party.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="pricing" class="pricing">
+        <div class="container">
+          <h2 class="section-title">Open core. No surprises.</h2>
+          <p class="section-subtitle">
+            Run the open-source runtime yourself for free, forever. Or let us host it.
+          </p>
+
+          <div class="price-grid">
+            <div class="price-card">
+              <h3>Self-host</h3>
+              <div class="amount">€0<span class="period">/forever</span></div>
+              <ul>
+                <li>MIT-licensed runtime</li>
+                <li>All five memory layers</li>
+                <li>Slack transport</li>
+                <li>Local Claude CLI billing</li>
+                <li>Community Discord support</li>
+              </ul>
+            </div>
+            <div class="price-card">
+              <h3>Free Cloud</h3>
+              <div class="amount">€0<span class="period">/month</span></div>
+              <ul>
+                <li>1,000 episodes/mo</li>
+                <li>1 workspace, 1 seat</li>
+                <li>30-day retention</li>
+                <li>Community Discord</li>
+                <li>EU residency</li>
+              </ul>
+            </div>
+            <div class="price-card featured">
+              <h3>Pro</h3>
+              <div class="amount">€19<span class="period">/month</span></div>
+              <ul>
+                <li>25,000 episodes/mo</li>
+                <li>365-day retention</li>
+                <li>Private skills</li>
+                <li>API access</li>
+                <li>Email support 48h</li>
+              </ul>
+            </div>
+            <div class="price-card">
+              <h3>Enterprise</h3>
+              <div class="amount">from €1,500<span class="period">/month</span></div>
+              <ul>
+                <li>Unlimited everything</li>
+                <li>SSO + audit log</li>
+                <li>On-prem option</li>
+                <li>Dedicated support</li>
+                <li>Custom DPA + MSA</li>
+              </ul>
+            </div>
+          </div>
+
+          <p style="margin-top: 32px; color: var(--text-dim); font-size: 0.9rem;">
+            Cloud opens for paying customers in <strong>Q3 2026</strong>. Sign up to be notified.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <div class="container" style="text-align: center;">
+          <h2 class="section-title">Ready?</h2>
+          <p class="section-subtitle">The 5-layer memory diagram is in your terminal in 60 seconds.</p>
+          <div class="cta-row">
+            <a class="cta cta-primary" href="https://docs.thoth-runtime.dev/quickstart">Read the docs</a>
+            <a class="cta cta-secondary" href="https://github.com/thoth-runtime/thoth">Star on GitHub</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="container">
+        <div class="footer-grid">
+          <div class="footer-brand">
+            <a href="/" class="brand">THOTH</a>
+            <p>The lifelong-learning agent runtime. Open-source. MIT. Built in Frankfurt with care. Mythology over marketing.</p>
+          </div>
+          <div>
+            <h4>Product</h4>
+            <ul>
+              <li><a href="https://docs.thoth-runtime.dev">Documentation</a></li>
+              <li><a href="https://docs.thoth-runtime.dev/specs">Roadmap</a></li>
+              <li><a href="#pricing">Pricing</a></li>
+              <li><a href="https://app.thoth-runtime.dev/signup">Sign up</a></li>
+              <li><a href="https://status.thoth-runtime.dev">Status</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4>Community</h4>
+            <ul>
+              <li><a href="https://github.com/thoth-runtime/thoth">GitHub</a></li>
+              <li><a href="https://discord.gg/thoth-runtime">Discord</a></li>
+              <li><a href="https://twitter.com/thothruntime">Twitter</a></li>
+              <li><a href="https://bsky.app/profile/thothruntime.dev">Bluesky</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4>Legal</h4>
+            <ul>
+              <li><a href="/legal/imprint">Imprint</a></li>
+              <li><a href="/legal/privacy">Privacy</a></li>
+              <li><a href="/legal/terms">Terms</a></li>
+              <li><a href="/legal/subprocessors">Subprocessors</a></li>
+              <li><a href="/security">Security</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>© 2026 ArchiTech AI UG (haftungsbeschränkt) · All rights reserved</span>
+          <span>Built in Frankfurt, Germany 🇩🇪</span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

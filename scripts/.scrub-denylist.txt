@@ -1,0 +1,41 @@
+# Forbidden terms in public Thoth OSS repo.
+#
+# verify-clean-extraction.sh greps for these patterns across:
+#   packages/, docs/, scripts/, README.md, CHANGELOG.md, etc.
+#
+# Allow-listed in: examples/apex-tutel/ (where they're meant to appear).
+#
+# Format: one pattern per line. Lines starting with # are comments.
+# Patterns are passed to grep -e (basic regex).
+#
+# Maintainer note: keep this file in sync with the apex-workspace
+# audit at runbooks/extraction-tutel-scrub.md
+
+# === Customer / product identifiers ===
+Tutel
+tutel-webapp
+tutor-orchestrator
+Tutel-DE
+
+# === Vendor / project identifiers (private) ===
+architechtion
+prj_sA9UV06e4qxqBpuMCn61pn9aXSgf
+blfbvssshdditthksbai
+fewmyzcsxrvgpawxzjct
+
+# === Founder personal Slack IDs (must use placeholders elsewhere) ===
+U084FAB663F
+U0ADCF2A28Y
+U084BH9SSK0
+U_AIDAN
+U_IAN
+
+# === Personal email accounts that may have appeared in test fixtures ===
+ian42\.dejongh
+ian\.theclose\.agency
+jacobdawson69
+
+# === API hosts that should not be hardcoded into public code ===
+# (commented out — these legitimately appear in docs as references)
+# api\.honcho\.dev
+# api\.mistral\.ai

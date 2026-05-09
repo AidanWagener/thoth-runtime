@@ -1,0 +1,36 @@
+{
+  "name": "@thoth-runtime/sdk",
+  "version": "0.5.0",
+  "description": "Thoth SDK — type definitions and plugin lifecycle for transports, memory adapters, skills, and reflection writers.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "homepage": "https://thoth-runtime.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thoth-runtime/thoth.git",
+    "directory": "packages/sdk"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
+}

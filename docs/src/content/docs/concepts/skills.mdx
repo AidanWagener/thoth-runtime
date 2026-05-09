@@ -1,0 +1,240 @@
+---
+title: Skills
+description: Voyager-style skill compilation — patterns recur, become candidates, you approve, library grows.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The agent at month 6 should be better at the work than the agent
+at month 1 — not because you've fine-tuned weights, but because
+the agent has *crystallized* the patterns that work.
+
+That crystallization is what skills do.
+
+## The Voyager loop
+
+Originally proposed in the Voyager paper (Wang et al., NVIDIA, 2023)
+in the context of Minecraft agents:
+
+```
+1. Agent encounters a task
+2. Agent attempts solution
+3. If successful, the solution becomes a candidate skill
+4. Skill is added to a library indexed by description
+5. Future tasks: search library by similarity, retrieve relevant skill
+6. Library grows; agent gets monotonically better over time
+```
+
+Thoth applies this to chat-based agents. With one critical
+modification: **founder approval gate**. Voyager auto-accepts skills;
+Thoth proposes them and waits for your ✅.
+
+## How it works in Thoth
+
+### 1. Pattern detection
+
+At session-end (`/done` or 30-min idle), the reflection subprocess
+scans the transcript for **recurring patterns** — things you and the
+agent did that look reusable.
+
+The reflection prompt asks (among other things):
+
+> "Was there a sequence of steps in this session that worked well
+> and could be invoked as a single named skill in the future?"
+
+Output is structured JSON:
+
+```json
+{
+  "should_skill": true,
+  "skill_slug": "sentry-triage",
+  "skill_description": "Triage Sentry issues by severity, group similar errors, propose actions.",
+  "skill_body": "..."
+}
+```
+
+### 2. Draft writer
+
+If `should_skill: true`, Thoth's skill draft writer:
+
+1. Validates `skill_slug` against the kebab-case regex
+   (`/^[a-z][a-z0-9-]{1,49}$/`)
+2. Writes `.claude/skills/<slug>/SKILL.md` with the proposed
+   content
+3. Writes `manifest.json` with `name`, `version: 0.1.0`,
+   `author: <your handle>`, default license
+4. Posts an approval card to your Slack DM
+
+### 3. Founder approval (✅ or ❌)
+
+The Slack approval card looks roughly like:
+
+```
+┌─ Skill draft proposed ─────────────────────────────┐
+│                                                     │
+│ Name: sentry-triage                                 │
+│ Description: Triage Sentry issues by severity...   │
+│                                                     │
+│ Source session: #ops/2026-04-15                    │
+│ Confidence: ✓✓✗  (2 verified-success, 1 failure)   │
+│                                                     │
+│  ✅  Accept  →  git commit + add to library         │
+│  ❌  Reject  →  delete file                         │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+**✅ accepts:** the skill is `git add`+`git commit`'d to your repo
+under your authorship (with `Co-Authored-By: thoth-runtime`).
+The skill becomes available on the next session.
+
+**❌ rejects:** the SKILL.md file is deleted. The reflection's
+proposal is logged but doesn't enter the library.
+
+**No reaction within 7 days:** the draft is auto-discarded.
+
+### 4. Skill invocation
+
+Once accepted, skills follow Anthropic's
+[agentskills.io](https://agentskills.io/) v1 progressive-disclosure
+pattern:
+
+1. **At boot:** only `name` + `description` from each skill's
+   manifest is loaded (~200 bytes per skill)
+2. **At first user-facing turn:** the compact catalog
+   (`name: description`) is in the system prompt
+3. **At skill invocation:** Claude detects intent matching, the
+   full SKILL.md loads on-demand into context for that turn only
+4. **Cache:** last 5 invoked skills' SKILL.md kept in memory; LRU evict
+
+This keeps the system prompt small while the library can grow large.
+
+## SKILL.md format
+
+```markdown
+---
+name: sentry-triage
+description: Triage Sentry issues by severity, group similar errors, propose actions
+version: 1.0.0
+author: "@operator-agent"
+license: MIT
+tags: [ops, sentry, triage]
+language: en
+entry: SKILL.md
+tools_allowed: [Read, WebFetch, Bash]
+context: fork
+thoth:
+  persona: thoth
+  required_layers: [episodic, procedural]
+  evolution_history:
+    - version: "1.0.0"
+      parent: null
+      mutation: null
+      created_at: "2026-04-15"
+---
+
+# Sentry Triage
+
+When invoked, this skill:
+
+1. Pulls latest Sentry issues for the configured project
+2. Groups by severity and frequency
+3. Drafts a triage summary with proposed actions
+
+## Steps
+
+...
+```
+
+The frontmatter is `agentskills.io/v1`-compatible (works in Claude
+Code, Cursor, OpenAI Agents). The `thoth.*` extensions are namespaced
+and ignored by other ecosystems.
+
+See [SPEC-skill-format-compat](/specs/) for the full schema.
+
+## Cross-ecosystem skills
+
+### Importing
+
+Bring skills from other ecosystems:
+
+```bash
+thoth skill import https://github.com/anthropic-ai/skills/tree/main/finance/pitchbook
+```
+
+Adds the skill to your `.claude/skills/` with `thoth.*` extensions
+defaulted (you can curate after).
+
+### Exporting
+
+Ship a Thoth skill to other ecosystems:
+
+```bash
+thoth skill export sentry-triage --format agentskills --out skill.tar.gz
+```
+
+The export strips `thoth.*` extensions so the skill is pure
+agentskills.io-format and runs in Claude Code, Cursor, OpenAI agents.
+
+## Skill genealogy (v0.6+)
+
+Tracked in [SPEC-skill-genealogy](/specs/). Skills evolve through
+**mutations**:
+
+- **compose** — new skill combines 2+ existing skills
+- **refine** — minor improvement (same intent, better execution)
+- **fork** — branch from existing for divergent purpose
+- **merge** — combine 2 forks back together
+
+Each mutation records `reward_delta` (success-rate change) so you
+can roll back to ancestors when a refinement regresses.
+
+## Skill marketplace (v0.6+)
+
+Tracked in [SPEC-marketplace](/specs/).
+
+Authors will publish skills to `marketplace.thoth-runtime.dev`:
+
+- Set price (free / one-time / monthly subscription)
+- Receive payouts via Stripe Connect (15% Thoth fee, 5% for
+  first-20-author program)
+- Buyers install with `thoth marketplace install @author/skill`
+
+## Manual skill creation
+
+You can also write skills manually rather than waiting for reflection
+to propose:
+
+```bash
+thoth skill create sentry-triage
+```
+
+Generates a stub SKILL.md + manifest. Edit, then:
+
+```bash
+thoth skill validate ./.claude/skills/sentry-triage
+```
+
+Once valid, the skill is available immediately (next session boot
+loads it in the catalog).
+
+## Anti-pattern: too many skills
+
+Skill libraries scale badly past ~100 skills. The selection cost
+(matching intent to skill) starts to add latency.
+
+If you find yourself with >100 skills:
+
+- Look for compositions you can collapse (5 narrow skills →
+  1 parameterized skill)
+- Deprecate skills with low usage (`thoth skill list --by usage`
+  shows the bottom)
+- Consider whether the "skill" should actually be in the persona
+  (e.g., a hard rule belongs in `RULES.md`, not as a skill)
+
+## What's next
+
+- [The 5-layer memory stack](/concepts/memory/) — where skills sit (L4)
+- [Reactions](/concepts/reactions/) — how ✅ patterns become skills
+- [SPEC-skill-format-compat](/specs/) — the full skill format spec
+- [SPEC-skill-genealogy](/specs/) — the v0.6 mutation tracking

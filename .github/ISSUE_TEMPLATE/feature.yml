@@ -1,0 +1,64 @@
+name: Feature proposal
+description: Propose a new feature or significant change.
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before implementing a non-trivial feature, open this issue first so the design can be aligned. Trivial improvements (typos, small bug fixes, doc tweaks) can go straight to PR.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem are you trying to solve? Who has it?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How would you solve it? What's the user-visible behavior?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What other approaches did you consider, and why are they worse?
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - Core runtime
+        - Memory subsystem
+        - Reflection
+        - Skills
+        - Multi-agent (Council/Party)
+        - Transport (Slack/Discord/...)
+        - Dashboard
+        - CLI
+        - Cloud (managed)
+        - Documentation
+        - Standards / interop
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: thesis
+    attributes:
+      label: Does this serve the cultivation thesis?
+      description: |
+        Thoth's design ethos is cultivation over extraction — durable memory, legible state, growing relationship. If your feature pushes against this (e.g. "make Apex auto-execute risky actions"), please justify in the proposal.
+      options:
+        - Yes, clearly
+        - Probably yes
+        - Neutral
+        - Probably no — needs discussion
+        - I'm not sure
+    validations:
+      required: true
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context

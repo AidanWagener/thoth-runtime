@@ -1,0 +1,24 @@
+{
+  "name": "@thoth-runtime/transport-discord",
+  "version": "0.5.0",
+  "description": "Discord transport for Thoth — placeholder, full implementation in v0.6 per SPEC-discord-transport.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "homepage": "https://thoth-runtime.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thoth-runtime/thoth.git",
+    "directory": "packages/transport-discord"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "echo 'transport-discord stub — full impl in v0.6' && exit 0",
+    "typecheck": "echo 'no sources yet' && exit 0",
+    "test": "echo 'no tests yet' && exit 0"
+  }
+}

@@ -1,0 +1,71 @@
+---
+title: Thoth
+description: The lifelong-learning agent runtime
+template: splash
+hero:
+  title: Thoth
+  tagline: The lifelong-learning agent runtime
+  actions:
+    - text: Quickstart
+      link: /quickstart/
+      icon: right-arrow
+      variant: primary
+    - text: GitHub
+      link: https://github.com/thoth-runtime/thoth
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+> *Thoth — Egyptian god of writing, wisdom, and the moon. Patron of
+> scribes. Recorder of words.*
+
+Thoth is an open-source agent runtime where memory accumulates in five
+composed layers, the agent judges itself through reflection, every chat
+reaction is a training signal, and skills crystallize into a versioned
+library that evolves over time.
+
+## What you can build
+
+<CardGrid>
+  <Card title="A Slack-native AI assistant" icon="rocket">
+    Drop the bridge into your Slack workspace. The first turn loads your
+    persona stack; replies in the same thread continue the same Claude
+    session. Reactions become learning signals.
+  </Card>
+  <Card title="An autonomous operator agent" icon="setting">
+    Configure ambient triggers, schedule self-spawns, define the budget
+    envelope. Agent quietly checks on what matters while you sleep.
+  </Card>
+  <Card title="A learning agent that grows" icon="seti:notebook">
+    Voyager-style skill compilation: every session ends with reflection,
+    proposed new skills, and four fan-out writers updating different
+    layers of memory. Founder approves; agent grows.
+  </Card>
+  <Card title="A multi-agent council" icon="puzzle">
+    Convene a debate of personas across heterogeneous models. Synthesis
+    visible. Cross-persona blind review removes attribution bias.
+  </Card>
+</CardGrid>
+
+## The five layers of memory
+
+```
+L5  REFLECTION    · session-end critique → 4 fan-out writers
+L4  PROCEDURAL    · skills, persona, hard rules
+L3  EPISODIC      · cosine recall over local embeddings
+L2  IDENTITY      · theory-of-mind on each peer (Honcho)
+L1  WORKING       · current session state
+```
+
+Each layer has its own writer, its own cadence, its own kind of truth.
+None can collapse into the others without losing what makes a mind
+a mind. [Read the full architecture →](/concepts/memory/)
+
+## Status
+
+**v0.5.0** — public release on **2026-07-22**.
+
+Star [github.com/thoth-runtime/thoth](https://github.com/thoth-runtime/thoth)
+to follow.

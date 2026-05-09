@@ -1,0 +1,24 @@
+name: Question
+description: Ask a question about Thoth.
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For real-time discussion, prefer Discord or GitHub Discussions. Use this issue type when you want a written, searchable answer.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What are you trying to do? What have you tried?
+  - type: textarea
+    id: looked
+    attributes:
+      label: Where you looked
+      description: Did you check the docs, Discord, GitHub Discussions, or other sources first?

@@ -1,0 +1,271 @@
+---
+title: The 5-layer memory stack
+description: Why memory is composed across five layers, each with its own writer, cadence, and kind of truth.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Most agent frameworks treat memory as RAG: a vector store and a
+retriever. You stuff relevant chunks into context, hope the model
+picks the right ones, and call it memory.
+
+This works for static-corpus Q&A. It does not work for **agents that
+grow over time**.
+
+Thoth's answer is five composed layers.
+
+## The stack
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  L5  REFLECTION    · self-judgment at session end                │
+├──────────────────────────────────────────────────────────────────┤
+│  L4  PROCEDURAL    · skills, persona, hard rules                 │
+├──────────────────────────────────────────────────────────────────┤
+│  L3  EPISODIC      · cosine recall over local embeddings         │
+├──────────────────────────────────────────────────────────────────┤
+│  L2  IDENTITY      · theory-of-mind on each peer (Honcho)        │
+├──────────────────────────────────────────────────────────────────┤
+│  L1  WORKING       · current session state                       │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+Each layer has its own:
+
+- **Writer** — who/what writes new entries
+- **Cadence** — how often writes happen
+- **Read pattern** — when entries are loaded into context
+- **Retention** — how long entries persist
+- **Truth kind** — *what kind of fact* this layer holds
+
+Below: each layer in detail.
+
+## L1 — Working memory
+
+> *What's happening right now in this session.*
+
+| Property | Value |
+|---|---|
+| Storage | Claude session state + auto-managed `MEMORY.md` file |
+| Writer | The model itself |
+| Cadence | Per-turn (implicit) |
+| Read pattern | Available throughout the session |
+| Retention | Session-lifetime; persists to file via Claude's auto-memory |
+| Truth | What is happening now |
+
+This is the layer everyone has. It's the conversation history Claude
+can see, plus any auto-memory file Claude writes to itself across
+sessions. Table stakes.
+
+You don't configure L1 — Claude handles it.
+
+## L2 — Identity memory
+
+> *Who is this person I'm talking to, and how should I respond?*
+
+| Property | Value |
+|---|---|
+| Storage | [Honcho](https://github.com/plastic-labs/honcho) (managed cloud or self-host) |
+| Writer | The bridge (per-turn fire-and-forget ingest) |
+| Cadence | Every turn |
+| Read pattern | Pre-spawn dialectic call, ~1.5s timeout |
+| Retention | Lifetime of the Honcho workspace |
+| Truth | Who each peer is |
+
+Identity memory is **theory-of-mind**: a derived, evolving model of
+*who each peer is* across all sessions, all topics, all time.
+
+Honcho's primitive is `Workspace > Peer > Session > Message` with
+two background processes:
+
+- **The Deriver** extracts observations (explicit facts + deductive
+  inferences) about each peer on every message.
+- **The Dialectic** answers "what should I know to respond to this
+  peer right now?" — pulling only relevant observations into the
+  current turn's context.
+
+Example observation Thoth might derive:
+
+> "User prefers terse answers when stressed. Switches to mythological
+> language when discussing system design — this seems intentional,
+> not performative. Uses 'lol' to indicate surprise rather than humor."
+
+These observations don't sit in your prompt. They sit in Honcho. The
+Dialectic surfaces only what's relevant to this turn as a
+`<user-model>` block prepended to the system context.
+
+<Aside type="tip" title="Honcho is optional">
+You can run Thoth without identity memory by leaving `HONCHO_API_KEY`
+unset. The bridge skips L2 and the agent works fine — it just doesn't
+build a per-peer model. We strongly recommend enabling it; the free
+tier at [app.honcho.dev](https://app.honcho.dev/) is generous.
+</Aside>
+
+## L3 — Episodic memory
+
+> *What happened?*
+
+| Property | Value |
+|---|---|
+| Storage | SQLite + 384-dim Float32 BLOB embeddings |
+| Writer | The bridge (post-success, async) |
+| Cadence | Per turn (after the user has the reply) |
+| Read pattern | First turn of each new thread; `/recall` on demand |
+| Retention | Configurable per Cloud tier (Free 30d, Pro 365d, Enterprise unlimited) |
+| Truth | The autobiographical record |
+
+Every successful turn is summarized, embedded, and stored. When you
+start a new thread, Thoth runs cosine search (recency-weighted,
+τ = 14 days) over recent episodes and finds the top 3 most similar
+past episodes. Those go in as a `<related-episodes>` block.
+
+This is what gives the agent **cross-thread continuity**. You're in
+a new Slack thread asking about cherry-picking. The agent doesn't
+remember that thread — but the embedding is similar to a thread
+from two weeks ago about merge strategies, which is similar to a
+thread from a month ago about staging-vs-prod policy. The agent
+surfaces that history.
+
+```ts
+// What goes in
+{
+  user_text: "How should I cherry-pick this hotfix?",
+  apex_summary: "Cherry-pick from staging to main; never merge...",
+  num_turns: 1,
+  total_cost_usd: 0.012
+}
+
+// 384-dim Float32 embedding generated locally via Xenova MiniLM
+// Cost: $0/encode, ~50–100ms on CPU
+// Cached on disk after first download (~25 MB)
+```
+
+We deliberately do NOT use `sqlite-vec`. At our scale (< 100K
+episodes), a JS-side cosine over a recency-pre-filtered candidate
+set (default 200) is fast and adds zero native-build complexity.
+
+## L4 — Procedural memory
+
+> *What works?*
+
+| Property | Value |
+|---|---|
+| Storage | `.claude/skills/<slug>/SKILL.md` + persona files (git-tracked) |
+| Writer | Reflection writer (drafts) → founder approval (commits) |
+| Cadence | Per-session at most; typically per-week or per-month |
+| Read pattern | Skill auto-discovery + persona loaded at session boot |
+| Retention | Permanent (until explicitly deleted) |
+| Truth | The durable rules of how this agent works |
+
+This is **skills** and **persona** — the crystallized output of
+sessions that have been judged worth keeping.
+
+**Skills** follow the [agentskills.io](https://agentskills.io/) v1
+format (also used by Anthropic Claude Code, OpenAI Agents, Cursor):
+
+```
+my-skill/
+├── SKILL.md        # human description (canonical)
+├── manifest.json   # name, version, author, license, tools_allowed
+└── src/            # files the skill uses
+```
+
+When invoked, the skill's full SKILL.md loads on-demand into Claude's
+context for that turn only.
+
+**Persona files** define the agent's identity. The default Thoth
+persona stack:
+
+- `IDENTITY.md` — one-liner persona name
+- `SOUL.md` — voice, mission, axioms
+- `RULES.md` — operational rules
+- `AGENTS.md` — subagent roster
+- `USER.md` — founder profile, communication preferences
+- `MEMORY.md` — long-term memory snapshot
+- `TOOLS.md` — available external services
+
+See [The persona stack](/concepts/persona-stack/) for the full
+walkthrough.
+
+## L5 — Reflection
+
+> *What should I learn from what just happened?*
+
+| Property | Value |
+|---|---|
+| Storage | Drafts to disk + Slack DMs |
+| Writer | A forked `claude -p --effort low` subprocess |
+| Cadence | At session end (`/done` command or 30-min idle) |
+| Read pattern | Founder review, then propagated to other layers |
+| Retention | Permanent in audit log |
+| Truth | What this agent should become |
+
+When a session ends, a fresh `claude -p` subprocess runs over the
+transcript and emits **structured JSON** describing:
+
+- What worked
+- What didn't
+- Should this become a new skill? (name + description + body)
+- What memory notes to save
+- What persona observations to consider
+- When to check back on this thread (`next_check_at`)
+- What user-model updates apply per peer
+
+The JSON gets parsed and **fanned out to four writers**:
+
+1. **Auto-Memory writer** — appends `memory_notes` to MEMORY.md
+   (with secret redaction)
+2. **Skill draft writer** — writes proposed `SKILL.md` to
+   `.claude/skills/<slug>/`, posts a Slack approval card
+3. **Persona observation writer** — DMs founders candidate
+   observations. **Never auto-applies.**
+4. **Honcho writer** — feeds `user_model_updates` back into Honcho
+   as Thoth-authored observations
+
+Reflection is the **growth loop**. Without it, the agent accumulates
+facts but doesn't accumulate wisdom.
+
+## Why five and not one
+
+You can imagine collapsing all this into a single vector store. The
+collapse loses something on every axis:
+
+- **Retention policy** — episodes can age out; persona is permanent;
+  identity slowly evolves; reflection is timestamped. A single store
+  has one retention policy.
+- **Writer** — Claude writes its own working memory. The bridge
+  writes episodic. Reflection writes drafts; you approve. Honcho
+  derives identity. Different writers, different invariants.
+- **Read pattern** — Identity surfaces pre-spawn. Episodic surfaces
+  on first turn of new threads. Persona loads on session start.
+  Reflection surfaces only as DMs.
+- **Mutability** — Persona is human-curated. Skills are
+  human-approved. Identity is machine-derived but human-correctable.
+  Episodes are append-only. Different governance.
+- **Truth kind** — L1 is "what's happening now." L2 is "who you are."
+  L3 is "what we did." L4 is "how we work." L5 is "what we should
+  become." These are different *kinds* of truth.
+
+Stuffing them into one vector store works for retrieval. It does
+not work for governance. And without governance, you don't have a
+mind — you have a search index.
+
+## Disabling layers
+
+Each non-essential layer can be disabled independently if you don't
+want it:
+
+```bash
+# In .env
+HONCHO_DISABLED=true       # disables L2 identity memory
+EPISODIC_DISABLED=true     # disables L3 cross-thread recall
+REFLECTION_DISABLED=true   # disables L5 (and skill compilation)
+```
+
+L1 working memory and L4 procedural always run.
+
+## What's next
+
+- [The persona stack](/concepts/persona-stack/) — how Thoth actually thinks
+- [Skills](/concepts/skills/) — Voyager-style skill compilation
+- [Reactions](/concepts/reactions/) — the ✅❌🧠🗑️👤 protocol

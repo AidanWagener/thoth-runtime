@@ -1,0 +1,17 @@
+# Funding configuration for github.com/thoth-runtime/thoth.
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+
+# GitHub Sponsors (per-username, multi-user is allowed)
+github: [thoth-runtime]
+
+# Custom (link to your own donation page)
+# custom: ['https://thoth-runtime.dev/sponsor']
+
+# Optional alternative funding sources:
+# patreon: thoth-runtime
+# open_collective: thoth-runtime
+# ko_fi: thoth-runtime
+# tidelift: npm/@thoth-runtime/core
+# liberapay: thoth-runtime
+# polar: thoth-runtime
+# buy_me_a_coffee: thoth-runtime

@@ -1,0 +1,89 @@
+---
+title: Discord transport (v0.6)
+description: First-class Discord integration shipping in v0.6. Spec is published; implementation in progress.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Coming in v0.6 (Q3 2026)">
+Discord transport ships in v0.6 per [SPEC-discord-transport](/specs/).
+This page is a forward-looking placeholder so you can plan around it.
+The Slack transport in v0.5 is the only currently-shipping option.
+</Aside>
+
+## What's planned
+
+A first-class `@thoth-runtime/transport-discord` package with feature
+parity to Slack:
+
+- **Discord Gateway WebSocket** connection (no public ingress)
+- **DM and channel-mention** dispatching
+- **Reaction handler** — ✅❌🧠🗑️👤 mapped identically to Slack
+- **Magic slash commands** — `/help`, `/whoami`, `/recall`, `/done`, `/loop-stop`
+- **Streaming replies** via message edits
+- **Per-thread session continuity** mapped to Discord channels and threads
+- **Self-spawn delivery** into the originating thread or DM
+
+Implementation tracked in [SPEC-discord-transport](/specs/) (~370 lines of
+spec covering the interface implementation, thread-key mapping, reaction
+handling, magic commands, streaming replies via message edits, persona
+drift handling, and configuration).
+
+## Why Discord matters
+
+- **OSS audience overlap** — many indie + OSS communities run on Discord
+- **Free for unlimited servers + members** (Slack's free tier caps history)
+- **Rich slash command + interaction APIs**
+- **Different surface, same architecture** — proves the runtime is
+  transport-agnostic
+
+## Configuration (planned shape)
+
+```ts
+import { defineConfig } from '@thoth-runtime/core';
+import discord from '@thoth-runtime/transport-discord';
+
+export default defineConfig({
+  transport: discord({
+    botToken: process.env.DISCORD_BOT_TOKEN!,
+    applicationId: process.env.DISCORD_APPLICATION_ID!,
+    allowedUsers: process.env.ALLOWED_USERS?.split(',') ?? [],
+    allowedGuilds: process.env.ALLOWED_GUILDS?.split(',') ?? [],
+  }),
+  // ... rest of config
+});
+```
+
+## Cross-transport identity
+
+In v0.6, Discord and Slack will be **distinct transports per session**.
+The Honcho identity layer is queried separately per peer ID.
+
+In Y2 (per [SPEC-multi-llm-party](/specs/) successor), we plan to add
+**unified peer identity** so the same human reaching the bot from Discord
+and Slack maps to the same Honcho peer. Until then, the bot treats them
+as different people (which is correct from a Slack-API perspective; same
+human, different namespace).
+
+## Why not in v0.5
+
+Two reasons:
+
+1. **Speed-to-market** — shipping monolithic v0.5 with one transport
+   beats shipping a delayed v0.5 with two
+2. **Architectural cleanup** — splitting the Slack transport out of
+   `core` and into `@thoth-runtime/transport-slack` requires a refactor
+   we deliberately deferred to v0.6 (see [ADR-0001](/adr/0001-monolithic-v05/))
+
+## Get notified
+
+- Star the repo: [github.com/thoth-runtime/thoth](https://github.com/thoth-runtime/thoth)
+- Watch the spec: [SPEC-discord-transport](/specs/)
+- Subscribe to release notes via GitHub Releases
+- Discord: [discord.gg/thoth-runtime](https://discord.gg/thoth-runtime) — `#announcements` channel
+
+## What's next
+
+- [Slack setup](/transports/slack/) — what currently works
+- [Webhook transport](/transports/webhook/) — also v0.6+
+- [SPEC-discord-transport](/specs/) — the implementation spec
