@@ -79,7 +79,7 @@ export interface CosmosPeer {
 export interface CosmosComet {
   /** Scheduled run id. */
   id: number;
-  /** Anchor: target peer or "apex". */
+  /** Anchor: target peer or "thoth" (the agent's self-peer). */
   anchor: string;
   /** When it'll fire. */
   runAt: number;

@@ -25,9 +25,9 @@ export async function feedHonchoUpdates(
   for (const [peerId, notes] of Object.entries(updates)) {
     for (const note of notes) {
       const observation = `[reflection-observation about ${peerId}] ${note}`.slice(0, 2000);
-      // Use the apex peer as author so the deriver attributes the
+      // Use the agent self-peer as author so the deriver attributes the
       // observation to the agent rather than to the human.
-      honcho.ingest(ctx.threadKey, 'apex', observation);
+      honcho.ingest(ctx.threadKey, 'thoth', observation);
       written++;
     }
   }

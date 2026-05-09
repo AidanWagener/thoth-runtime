@@ -67,7 +67,7 @@ export async function buildCouncilSnapshot(opts: {
   partyDailyCapUsd: number;
   partyDailyToday: { todayUsd: number; todayCount: number };
 }): Promise<CouncilSnapshot> {
-  const personaDir = path.join(opts.bridgeRepoRoot, '..', '..', 'persona', 'apex', 'party');
+  const personaDir = path.join(opts.bridgeRepoRoot, '..', '..', 'persona', 'thoth', 'party');
   const allRoles = Object.keys(AGENTS) as AgentRole[];
   // Order: BMAD speaking order + Master last (synthesis position).
   const orderedRoles: AgentRole[] = ['analyst', 'pm', 'architect', 'dev', 'qa', 'ux', 'master'];

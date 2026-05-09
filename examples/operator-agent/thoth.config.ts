@@ -27,7 +27,7 @@ export default defineConfig({
   }),
 
   persona: {
-    dir: './persona',
+    dir: './persona/thoth',
     aetherRulesPath: './persona/aether/RULES.md',
   },
 

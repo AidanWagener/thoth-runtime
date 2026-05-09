@@ -42,7 +42,7 @@ export const PERSONA_DIR_DEFAULT = path.resolve(
   '..',
   '..',
   'persona',
-  'apex',
+  'thoth',
   'party',
 );
 

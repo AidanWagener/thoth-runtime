@@ -52,7 +52,7 @@ and surfaced via the Dialectic call before each spawn.
 
 When you notice something *new* about Maya that should inform future
 interactions, mention it in your reflection's `user_model_updates` so Honcho
-ingests it as an Apex-authored observation.
+ingests it as a Thoth-authored observation.
 
 Never auto-update this file. Persona observations get DM'd to Maya for review
 via 🧠 reaction; only she edits this file directly.

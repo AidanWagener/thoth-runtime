@@ -482,7 +482,7 @@ export class DashboardServer {
   private async servePersonaStack(_url: string, res: http.ServerResponse): Promise<void> {
     const fs = await import('fs/promises');
     const path = await import('path');
-    const personaDir = path.join(this.deps.bridgeRepoRoot, '..', '..', 'persona', 'apex');
+    const personaDir = path.join(this.deps.bridgeRepoRoot, '..', '..', 'persona', 'thoth');
     const aetherRulesPath = path.join(this.deps.bridgeRepoRoot, '..', '..', 'persona', 'aether', 'RULES.md');
     const files = [
       { name: 'IDENTITY', file: 'IDENTITY.md' },

@@ -128,7 +128,7 @@ export async function start(): Promise<void> {
     partyDailyCap.init(config.DB_PATH);
     const personaDir =
       config.PARTY_PERSONA_DIR ||
-      path.resolve(config.PERSONA_DIR, '..', 'apex', 'party');
+      path.resolve(config.PERSONA_DIR, '..', 'thoth', 'party');
     const sandboxRoot = path.join(config.SANDBOX_ROOT, '_parties');
     await fs.mkdir(sandboxRoot, { recursive: true });
     partyOrchestrator = new PartyOrchestrator({

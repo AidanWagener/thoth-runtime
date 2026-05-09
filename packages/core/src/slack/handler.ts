@@ -530,7 +530,7 @@ export function registerHandlers(deps: HandlerDeps): HandlerExports {
     // representations.
     if (honcho?.enabled) {
       honcho.ingest(threadKey, identity.user.id, prompt);
-      honcho.ingest(threadKey, 'apex', assembled);
+      honcho.ingest(threadKey, 'thoth', assembled);
       eventBus.emitEvent({ kind: 'honcho.ingest', ts: Date.now(), threadKey, peer: identity.user.id });
     }
 

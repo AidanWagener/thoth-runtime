@@ -144,7 +144,7 @@ export function registerReactionHandlers(deps: ReactionHandlerDeps): void {
                 `[party-feedback] ${userId} ${verb} agent=${match.agent_role} ` +
                 `in party=${p.id} (template=${p.template}, mode=${p.mode}). ` +
                 `Their contribution: ${match.content.slice(0, 240)}`;
-              honcho.ingest(p.thread_key, 'apex', observation);
+              honcho.ingest(p.thread_key, 'thoth', observation);
               logger.info(
                 { partyId: p.id, role: match.agent_role, userId, reaction, verb },
                 'party-message feedback queued to honcho',
@@ -288,8 +288,8 @@ export function registerReactionHandlers(deps: ReactionHandlerDeps): void {
     }
 
     if (FEEDBACK_REACTIONS.has(reaction) && honcho?.enabled) {
-      const observation = `[user-feedback :${reaction}: from ${userId}] reacted to apex's reply: ${episode.apex_summary.slice(0, 240)}`;
-      honcho.ingest(episode.thread_key, 'apex', observation);
+      const observation = `[user-feedback :${reaction}: from ${userId}] reacted to thoth's reply: ${episode.apex_summary.slice(0, 240)}`;
+      honcho.ingest(episode.thread_key, 'thoth', observation);
       logger.info(
         { episodeId: episode.id, userId, reaction },
         'user-feedback queued to honcho',

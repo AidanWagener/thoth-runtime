@@ -2,7 +2,7 @@ import type { PeerSpec } from './honcho';
 import type { Allowlist } from '../policy/allowlist';
 
 /**
- * Build the static peer roster: every allowlisted Slack user + the apex
+ * Build the static peer roster: every allowlisted user + the agent
  * self-peer. Called once at boot to ensure peers exist in Honcho before
  * any traffic flows.
  *
@@ -21,15 +21,15 @@ export function buildPeerRoster(allowlist: Allowlist): PeerSpec[] {
     },
   }));
 
-  const apex: PeerSpec = {
-    id: 'apex',
+  const self: PeerSpec = {
+    id: 'thoth',
     metadata: {
       kind: 'agent',
       role: 'unified_operator',
-      persona_repo: 'apex-workspace/persona/apex',
+      persona_repo: 'persona/thoth',
       registered_at: new Date().toISOString(),
     },
   };
 
-  return [...humans, apex];
+  return [...humans, self];
 }
