@@ -21,7 +21,7 @@ jobs:
   release:
     name: Version + publish
     runs-on: ubuntu-22.04
-    if: github.repository == 'thoth-runtime/thoth'
+    if: github.repository == 'AidanWagener/thoth-runtime'
     steps:
       - uses: actions/checkout@v4
         with:
