@@ -40,7 +40,7 @@
     "release": "changeset version && changeset publish"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
+    "@biomejs/biome": "^2.4.15",
     "@changesets/cli": "^2.27.10",
     "@types/node": "^22.10.5",
     "tsx": "^4.19.2",
